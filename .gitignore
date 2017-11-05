@@ -45,5 +45,6 @@ crashlytics-build.properties
 fabric.properties
 
 .idea/
+.cache/
 .coverage
 *.egg-info
