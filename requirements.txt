@@ -1,0 +1,2 @@
+astropy>2
+ccdproc
