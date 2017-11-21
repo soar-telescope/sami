@@ -24,6 +24,8 @@ install:
 - conda create -q -n astroconda stsci python=$TRAVIS_PYTHON_VERSION
 - source activate astroconda
 - pip install coveralls
+- pip install -r requirements.txt
+- pip install .
 
 script:
 - pytest

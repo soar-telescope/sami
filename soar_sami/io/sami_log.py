@@ -8,20 +8,21 @@ class SAMIFormatter(logging.Formatter):
     """
     Custom Log Formatter for SAMI's messages.
     """
-
-    err_fmt = "[E] %(msg)s"
-    dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
-    info_fmt = "    %(msg)s"
-    warn_fmt = "[W] %(msg)s"
-
     def __init__(self, fmt="%(levelno)s: %(msg)s"):
+
         logging.Formatter.__init__(self, fmt)
 
+        self.err_fmt = "[E] %(msg)s"
+        self.dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
+        self.info_fmt = "    %(msg)s"
+        self.warn_fmt = "[W] %(msg)s"
+
     def disable_colors(self):
-        err_fmt = "[E] %(msg)s"
-        dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
-        info_fmt = "    %(msg)s"
-        warn_fmt = "[W] %(msg)s"
+
+        self.err_fmt = "[E] %(msg)s"
+        self.dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
+        self.info_fmt = "    %(msg)s"
+        self.warn_fmt = "[W] %(msg)s"
 
     def enable_colors(self):
 
@@ -34,11 +35,10 @@ class SAMIFormatter(logging.Formatter):
         BOLD = '\033[1m'
         UNDERLINE = '\033[4m'
 
-        err_fmt = FAIL + "[E]" + ENDC + " %(msg)s"
-        dbg_fmt = OKBLUE + "[D]" + ENDC + " %(module)s: %(lineno)d: %(msg)s"
-        info_fmt = "   %(msg)s"
-        warn_fmt = WARNING + "[W]" + ENDC + " %(msg)s"
-
+        self.err_fmt = FAIL + "[E]" + ENDC + " %(msg)s"
+        self.dbg_fmt = OKBLUE + "[D]" + ENDC + " %(module)s: %(lineno)d: %(msg)s"
+        self.info_fmt = "   %(msg)s"
+        self.warn_fmt = WARNING + "[W]" + ENDC + " %(msg)s"
 
     def format(self, record):
 
@@ -48,16 +48,16 @@ class SAMIFormatter(logging.Formatter):
 
         # Replace the original format with one customized by logging level
         if record.levelno == logging.DEBUG:
-            self._fmt = SAMIFormatter.dbg_fmt
+            self._fmt = self.dbg_fmt
 
         elif record.levelno == logging.INFO:
-            self._fmt = SAMIFormatter.info_fmt
+            self._fmt = self.info_fmt
 
         elif record.levelno == logging.ERROR:
-            self._fmt = SAMIFormatter.err_fmt
+            self._fmt = self.err_fmt
 
         elif record.levelno == logging.WARNING:
-            self._fmt = SAMIFormatter.warn_fmt
+            self._fmt = self.warn_fmt
 
         # Call the original formatter class to do the grunt work
         result = logging.Formatter.format(self, record)
@@ -97,7 +97,6 @@ class SAMILog(logging.Logger):
 
         if debug:
             self.set_debug()
-
 
     def set_verbose(self, verbose=True):
         if verbose:
