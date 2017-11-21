@@ -3,9 +3,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-from argparse import ArgumentParser
-
-from .io import SAMILog
+from .io.logging import SAMILog
 
 __author__ = 'Bruno Quint'
 

@@ -1,5 +1,3 @@
-from __future__ import absolute_import
 
+from . import logging
 from .SAMIData import SAMIData
-from .logging import SAMILog
-

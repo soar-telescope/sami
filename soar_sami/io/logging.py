@@ -1,27 +1,44 @@
 
 import logging
 
+__all__ = ['SAMIFormatter', 'SAMILog']
+
 
 class SAMIFormatter(logging.Formatter):
     """
     Custom Log Formatter for SAMI's messages.
     """
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
-    err_fmt = FAIL + "[E]" + ENDC + " %(msg)s"
-    dbg_fmt = OKBLUE + "[D]" + ENDC + " %(module)s: %(lineno)d: %(msg)s"
-    info_fmt = "   %(msg)s"
-    warn_fmt = WARNING + "[W]" + ENDC + " %(msg)s"
+    err_fmt = "[E] %(msg)s"
+    dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
+    info_fmt = "    %(msg)s"
+    warn_fmt = "[W] %(msg)s"
 
     def __init__(self, fmt="%(levelno)s: %(msg)s"):
         logging.Formatter.__init__(self, fmt)
+
+    def disable_colors(self):
+        err_fmt = "[E] %(msg)s"
+        dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
+        info_fmt = "    %(msg)s"
+        warn_fmt = "[W] %(msg)s"
+
+    def enable_colors(self):
+
+        HEADER = '\033[95m'
+        OKBLUE = '\033[94m'
+        OKGREEN = '\033[92m'
+        WARNING = '\033[93m'
+        FAIL = '\033[91m'
+        ENDC = '\033[0m'
+        BOLD = '\033[1m'
+        UNDERLINE = '\033[4m'
+
+        err_fmt = FAIL + "[E]" + ENDC + " %(msg)s"
+        dbg_fmt = OKBLUE + "[D]" + ENDC + " %(module)s: %(lineno)d: %(msg)s"
+        info_fmt = "   %(msg)s"
+        warn_fmt = WARNING + "[W]" + ENDC + " %(msg)s"
+
 
     def format(self, record):
 
@@ -50,15 +67,23 @@ class SAMIFormatter(logging.Formatter):
 
         return result
 
+    def use_colors(self, colors):
+
+        if colors:
+            self.enable_colors()
+        else:
+            self.disable_colors()
+
 
 class SAMILog(logging.Logger):
 
-    def __init__(self, name, verbose=True, debug=False):
+    def __init__(self, name, verbose=True, debug=False, use_colors=False):
 
         logging.Logger.__init__(self, name)
 
         # Set log format
         self.formatter = SAMIFormatter()
+        self.formatter.use_colors(use_colors)
 
         # Set log handler to the terminal
         self.stream_handler = logging.StreamHandler()
@@ -72,6 +97,7 @@ class SAMILog(logging.Logger):
 
         if debug:
             self.set_debug()
+
 
     def set_verbose(self, verbose=True):
         if verbose:

@@ -13,10 +13,10 @@ is not realiable at all.
 The SAMI pipeline will be divided into five main routines. The idea is that they are independent but relie on each 
 other.  
 
-*[ ] Data Receiver
+*[ ] Data Watcher
 *[ ] Data Classifier
 *[ ] Data Quality
-*[ ] Data Process
+*[ ] Data Reduction
 *[ ] Data Display
 
 ### Data Receiver

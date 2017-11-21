@@ -1,2 +1,3 @@
 astropy>2
 ccdproc
+watchdog
