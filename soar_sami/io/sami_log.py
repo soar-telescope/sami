@@ -12,17 +12,17 @@ class SAMIFormatter(logging.Formatter):
 
         logging.Formatter.__init__(self, fmt)
 
-        self.err_fmt = "[E] %(msg)s"
+        self.err_fmt = "[X] %(msg)s"
         self.dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
         self.info_fmt = "    %(msg)s"
-        self.warn_fmt = "[W] %(msg)s"
+        self.warn_fmt = "[!] %(msg)s"
 
     def disable_colors(self):
 
-        self.err_fmt = "[E] %(msg)s"
+        self.err_fmt = "[X] %(msg)s"
         self.dbg_fmt = "[D] %(module)s: %(lineno)d: %(msg)s"
         self.info_fmt = "    %(msg)s"
-        self.warn_fmt = "[W] %(msg)s"
+        self.warn_fmt = "[!] %(msg)s"
 
     def enable_colors(self):
 
@@ -35,10 +35,11 @@ class SAMIFormatter(logging.Formatter):
         BOLD = '\033[1m'
         UNDERLINE = '\033[4m'
 
-        self.err_fmt = FAIL + "[E]" + ENDC + " %(msg)s"
-        self.dbg_fmt = OKBLUE + "[D]" + ENDC + " %(module)s: %(lineno)d: %(msg)s"
+        self.err_fmt = "[" + FAIL + "X" + ENDC + "] %(msg)s"
+        self.dbg_fmt = "[" + OKBLUE + "D" + ENDC +\
+                       "] %(module)s: %(lineno)d: %(msg)s"
         self.info_fmt = "   %(msg)s"
-        self.warn_fmt = WARNING + "[W]" + ENDC + " %(msg)s"
+        self.warn_fmt = "[" + WARNING + "!" + ENDC + "] %(msg)s"
 
     def format(self, record):
 

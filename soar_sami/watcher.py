@@ -1,20 +1,14 @@
 #!/usr/bin/env python 
 # -*- coding: utf8 -*-
 
-
-from __future__ import absolute_import
-
 import os
-import logging
 import time
 
 from watchdog.observers import Observer
 from watchdog.events import LoggingEventHandler
 from watchdog.events import FileSystemEventHandler
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
+from soar_sami.io.sami_log import SAMILog
 
 __author__ = 'Bruno Quint'
 
@@ -40,11 +34,13 @@ def watch(path):
     observer = Observer()
     observer.schedule(event_handler, path, recursive=True)
     observer.start()
+
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
+
     observer.join()
 
 
@@ -86,21 +82,17 @@ class SAMIFileHandler(FileSystemEventHandler):
         pass
 
     def on_moved(self, event):
-        print
-        "MOVED " + str(event)
+        print("MOVED " + str(event))
         self.catch_all_handler(event)
 
     def on_created(self, event):
-        print
-        "CREATED " + str(event)
+        print("CREATED " + str(event))
         self.catch_all_handler(event)
 
     def on_deleted(self, event):
-        print
-        "DELETED " + str(event)
+        print("DELETED " + str(event))
         self.catch_all_handler(event)
 
     def on_modified(self, event):
-        print
-        "MODIFIED " + str(event)
+        print("MODIFIED " + str(event))
         self.catch_all_handler(event)

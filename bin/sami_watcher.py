@@ -1,11 +1,11 @@
 #!/usr/bin/env python 
 # -*- coding: utf8 -*-
 
+import soar_sami
+
 __author__ = 'Bruno Quint'
-
-
-from soar_sami import data_watcher
+__version__ = soar_sami.version
+print(__version__)
 
 test_path = '/home/bquint/Data/SAM/20160927/RAW'
-data_watcher.watch(test_path)
-
+soar_sami.watcher.watch(test_path)

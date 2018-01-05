@@ -1,7 +1,8 @@
 
-from . import classifier
-from . import data_reduction
-from . import data_quality
-from . import watcher
+import classifier
+import data_reduction
+import data_quality
+import watcher
+import version
 
 __all__ = ['classifier', 'data_reduction', 'data_quality', 'watcher']
