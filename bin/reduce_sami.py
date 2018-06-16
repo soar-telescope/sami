@@ -1,24 +1,39 @@
 #!/usr/bin/env python 
 # -*- coding: utf8 -*-
 
-import soar_sami
-
-from soar_sami.io import sami_log
+from soar_sami.data_reduction import reduce
+from soar_sami.tools import version
 
 __author__ = 'Bruno Quint'
-__version__ = soar_sami.version
-
-# TODO - Enter input path as command line argument.
-# test_path = '/home/bquint/Data/SAM/20160927/RAW'  # soarbr3
-test_path = '/Users/Bruno/Data/20170402/'  # qbook
-program_id = 'SO2025X-007'
-date = 'YYYY-MM-YY'
-
-# TODO - Check if input path exists
-logger = sami_log.SAMILog(__name__, debug=True)
-logger.info('SAMI Pipeline - Running on folder: {:s}'.format(test_path))
+__version__ = version
 
 
-def reduce_sami():
-    table = soar_sami.classifier.classify(test_path, program_id, date)
-    soar_sami.data_reduction.sami_reduce(table)
+def main():
+    args = _parse_arguments()
+    reduce.reduce_sami(args.path)
+
+
+def _parse_arguments():
+    """
+    Parse the argument given by the user in the command line.
+
+    Returns
+    -------
+        pargs : Namespace
+        A namespace containing all the parameters that will be used for SAMI
+        XJoin.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Perform data reduction on images obtained with SAMI."
+    )
+
+    parser.add_argument('path', type=str,
+                        help="Path containing the data to be reduced.")
+
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    main()

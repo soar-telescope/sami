@@ -1,4 +1,5 @@
 
-from soar_sami import classifier, data_reduction, version
+from soar_sami import data_reduction, tools
+from soar_sami.tools import version
 
-__all__ = ['classifier', 'data_reduction']
+__all__ = ['data_reduction', 'tools']
