@@ -85,6 +85,7 @@ def reduce_sami(path):
         ]
 
         master_zero_fname = os.path.join(path, 'RED', zero_list_name + '.fits')
+        logger.info("Writing master zero to: {}".format(master_zero_fname))       
 
         zero_combine = combine.ZeroCombine(
             input_list=zero_combine_files,
@@ -160,6 +161,8 @@ def reduce_sami(path):
 
                 sami_merger.bias_file = master_zero_fname
                 sami_merger.flat_file = master_flat_fname
+                sami_merger.cosmic_rays = True
+
                 d = sami_merger.get_joined_data(obj_file)
                 h = pyfits.getheader(obj_file)
 
