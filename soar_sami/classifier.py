@@ -1,5 +1,6 @@
 
 import threading
+import numpy as np
 import pandas as pd
 import os
 
@@ -10,62 +11,73 @@ from astropy.io import fits
 from datetime import datetime
 from glob import glob
 
-from .io import sami_log
+from .io.sami_log import SAMILog
+from .io.sami_data import SAMI_Data
 
 __author__ = 'Bruno Quint'
-logger = sami_log.SAMILog(__name__, debug=True)
+logger = SAMILog(__name__, debug=True)
+
+COLUMNS = {
+    #'id': "int64",
+    'filename': "str",
+    'date_created': "str",
+    'time_created': "str",
+    # 'ra': "float64",
+    # 'dec': "float64",
+    # 'ccdsum': "str",
+    # 'obs_type': "str",
+    # 'obs_name' : "str",
+    # 'obs_comments': "str",
+    # 'exp_time' : "float64",
+    # 'filter': "str",
+    # 'merged': "bool",
+    # 'bias_subtracted': "bool",
+    # 'bias_name': "str",
+    # 'flat_normalized': "bool",
+    # 'flat_name': "str",
+    # 'combined': "bool",
+    # 'astrometric_solution_found': "bool"
+}
 
 
-def classify(path):
+def classify(path, pid, date):
+    """
+    Args:
 
-    create_database(path, '.temp.db')
+        path (string): path to the folder that contains the data to be reduced.
 
-    return 0
+        pid (string): Program ID.
 
+        date (string): observation date in the following format YYYY-MM-DD where
+            YYYY, MM, DD are all integers.
 
-def create_database(path, database_name):
+    """
 
-    logger.debug('Starting to create a database.')
+    database_name = '.temp.db'
 
-    columns = [
-        'id',
-        'filename',
-        'date_created',
-        'time_created',
-        'ra',
-        'dec',
-        'ccdsum',
-        'obs_type',
-        'obs_name',
-        'obs_comments',
-        'exp_time',
-        'filter',
-        'merged',
-        'bias_subtracted',
-        'flat_normalized',
-        'combined',
-        'astrometric_solution_found'
-    ]
+    logger.debug('Starting to create a DataFrame.')
+    df = pd.DataFrame(columns=COLUMNS.keys())
 
-    logger.debug('Connecting to the database: {:s}'.format(database_name))
-    conn = sql.connect(os.path.join(path, database_name))
-    cur = conn.cursor()
+    for c in df.columns:
+        df[c] = df[c].astype(COLUMNS[c])
 
     logger.debug(
         'Walking through the files within the folder {:s}.'.format(path))
 
-    df = pd.DataFrame(columns=columns)
-
-    logger.debug('Walking through the path recursively.')
-
     for root, dirs, files in os.walk(path, topdown=False):
         for name in files:
             if os.path.splitext(name)[-1] in ['.fits', '.fits.bz2']:
-                logger.debug('  {:s}'.format(os.path.join(root, name)))
 
-                h = fits.getheader(os.path.join(root, name))
+                logger.debug('Update database {:s} with file {:s}'.format(
+                    database_name, name))
 
-    conn.close()
+                ad = SAMI_Data(os.path.join(root, name))
+                s = ad.to_series()
+
+
+    return 0
+
+
 
 
 class DataClassifier(threading.Thread):

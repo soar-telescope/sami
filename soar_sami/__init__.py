@@ -1,8 +1,4 @@
 
-import classifier
-import data_reduction
-import data_quality
-import watcher
-import version
+from soar_sami import classifier, data_reduction, version
 
-__all__ = ['classifier', 'data_reduction', 'data_quality', 'watcher']
+__all__ = ['classifier', 'data_reduction']
