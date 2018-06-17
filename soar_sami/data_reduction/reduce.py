@@ -70,7 +70,7 @@ def reduce_sami(path):
             data, header, prefix = sami_merger.join_and_process(data, header)
 
             path, fname = os.path.split(zero_file)
-            zero_file = os.path.join(path, 'RED', fname)
+            zero_file = os.path.join(path, 'RED', prefix + fname)
             pyfits.writeto(zero_file, data, header)
 
         ic = ccdproc.ImageFileCollection(
@@ -125,7 +125,7 @@ def reduce_sami(path):
                 d, h, p = sami_merger.join_and_process(d, h)
 
                 path, fname = os.path.split(flat_file)
-                flat_file = os.path.join(path, 'RED', fname)
+                flat_file = os.path.join(path, 'RED', p + fname)
                 pyfits.writeto(flat_file, d, h)
 
             master_flat_fname = flat_list_name + '.fits'
@@ -168,6 +168,6 @@ def reduce_sami(path):
                 d, h, p = sami_merger.join_and_process(d, h)
 
                 path, fname = os.path.split(obj_file)
-                obj_file = os.path.join(path, 'RED', fname)
+                obj_file = os.path.join(path, 'RED', p + fname)
                 pyfits.writeto(obj_file, d, h)
 

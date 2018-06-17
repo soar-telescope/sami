@@ -4,6 +4,7 @@ v0.0.0 - Initial Version.
 v0.1.0 - Pipeline actually running.
        - To Do: Improve LaCosmic parameters.
 v0.1.1 - Fixed bug related to master bias and flat names.
+       - Added prefix to reduced data.
 """
 
 api = 0
