@@ -84,7 +84,7 @@ def reduce_sami(path):
             for f in ic.files_filtered(obstype='ZERO')
         ]
 
-        master_zero_fname = os.path.join(path, 'RED', zero_list_name + '.fits')
+        master_zero_fname = zero_list_name + '.fits'
         logger.info("Writing master zero to: {}".format(master_zero_fname))       
 
         zero_combine = combine.ZeroCombine(
@@ -128,8 +128,7 @@ def reduce_sami(path):
                 flat_file = os.path.join(path, 'RED', fname)
                 pyfits.writeto(flat_file, d, h)
 
-            master_flat_fname = os.path.join(path, 'RED',
-                                             flat_list_name + '.fits')
+            master_flat_fname = flat_list_name + '.fits'
 
             flat_combine_files = [
                 os.path.join(path, 'RED', os.path.split(f)[-1])
