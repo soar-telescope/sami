@@ -9,7 +9,7 @@ api = 0
 feature = 1
 bug = 0
 
-month = 06
+month = 6
 year = 2018
 
 __str__ = "v{api:d}.{feature:d}.{bug:d} {month:d}, {year:d}".format(**locals())

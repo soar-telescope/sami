@@ -18,13 +18,15 @@ here = path.abspath(path.dirname(__file__))
 #with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 #    long_description = f.read()
 
+from soar_sami.tools import version
+
 setup(
     name='soar-sami',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.0.0',
+    version="v{0.api:d}.{0.feature:d}.{0.bug:d}".format(version),
 
     description='Data-Reduction Pipeline for the SAM Imager, a facility '
                 'instrument at SOAR Telescope',
