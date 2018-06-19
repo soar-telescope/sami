@@ -62,24 +62,26 @@ so a installation have to be performed.
   command:
 
   ```
+  (my_virtual_env) $ conda install -c astropy ccdproc
   ```
 
   Once you have everything, check if you have all the required packages
   by typing:
 
   ```
+  (my_virtual_env) path_to_the_samidr $ python setup.py test
   ```
 
   If you receive no error, you can install the package using `pip`:
 
   ```
-  $ pip install .
+  (my_virtual_env) path_to_the_samidr pip install .
   ```
 
   If you are updating the SAMI Data-Reduction Pipeline, you must type:
 
   ```
-  $ pip install --upgrade .
+  (my_virtual_env) path_to_the_samidr $ pip install --upgrade .
   ```
 
 
