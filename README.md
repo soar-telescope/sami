@@ -4,44 +4,87 @@
 [![Coverage Status](https://coveralls.io/repos/github/soar-telescope/sami/badge.svg?branch=master)](https://coveralls.io/github/soar-telescope/sami?branch=master)
 
 
-This is a new pipeline for the SAM Imager using pure Python and libraries. At the moment, this pipeline is intended to 
-be used locally so a installation have to be performed. The SAMI Pipeline is now in an early development state and it 
-is not realiable at all. 
+This is a new pipeline for the SAM Imager using pure Python and
+libraries. At the moment, this pipeline is intended to be used locally
+so a installation have to be performed.
 
-## Pipeline Structure
+## Features
 
-The SAMI pipeline will be divided into five main routines. The idea is that they are independent but relie on each 
-other.  
+    * Data Reduction
 
-*[ ] Data Watcher
-*[ ] Data Classifier
-*[ ] Data Quality
-*[ ] Data Reduction
-*[ ] Data Display
+### Data Reduction
 
-### Data Receiver
+ Once installed, you can call the data reduction software using a
+ terminal by typing `sreduce-sami $PATH`, where `$PATH` is a directory
+ containing raw files. The processed data will be stored into a new
+ folder called `$PATH\RED`. Each file will receive a prefix accordingly
+ to the corrections applied.
 
-An online or offline database constructor. It will be used to feed a database that will be used further in the pipeline. 
-For now, we will priorize the offline version and for the database we will use SQLite.
+ Here are the data reduction processed steps:
 
-### Data Classifier
+ 1) Overscan correction: reduce-sami sum each overscan row and fit a
+ 3rd degree polynomium to the result. This polynomium is then subtracted
+ from each column on each extension.
 
-Once we have a database with the relevant information (i.e., metadata extracted from the FITS headers), we can classify 
-them. This should be straightforward considering the small number of different configurations at SAMI but still has to 
-be done.
+ 2) Move the overscan region to the outer edges of the detector and
+ merge the four data arrays into a single one.
 
-### Data Quality
+ 3) ZERO images are combined using the average and minmax clip with the
+ default thresholds.
 
-This will be one of the trickiest part. How do we know that the metadata is actually right? How do we know if a FLAT
-image was not actually an OBJECT image and vice-e-versa? 
+ 4) ZERO subtraction is performed using simple subtraction operation.
 
-### Data Process
+ 5) FLAT images are combined using the median and sigma clip with the
+ default thresholds. The master flat is normalized using 10% of the
+ image size centered in the middle of the merged image.
 
-Once we have our data pre-analysed and classified we can perform the data reduction. This, again, is straightforward 
-considering that the [AstroPy]() and [ccdproc]() packages have most of the required routines.
+ 6) FLAT correction is performed using common division.
 
-### Data Display
+ 7) Cosmic rays are cleaned using LaCosmic
+ [(Dokkun, 2001)](http://www.astro.yale.edu/dokkum/lacosmic/) with the
+ default parameters.
 
-This is the very last past of the pipeline. We want to run a local aplication where the data can be easily found. Think 
-of it as a local archive used to read and update night logs and display the data.
-       
+ The prefixes on the processed data are:
+
+ * m : image was **m**erged.
+ * z : image was **z**ero subtracted.
+ * r : **r**emoved cosmic rays form image.
+ * f : image was **f**lat fielded.
+
+## Install
+
+  The simplest way to use the SAMI Data-Reduction Pipeline is using
+  [astroconda](https://astroconda.readthedocs.io/en/latest/), since it
+  contains most of the packages needed.
+
+  You will still need `astropy:ccdproc`. To do so, activate the
+  `astroconda` virtual environment and install it using the following
+  command:
+
+  ```
+  ```
+
+  Once you have everything, check if you have all the required packages
+  by typing:
+
+  ```
+  ```
+
+  If you receive no error, you can install the package using `pip`:
+
+  ```
+  $ pip install .
+  ```
+
+  If you are updating the SAMI Data-Reduction Pipeline, you must type:
+
+  ```
+  $ pip install --upgrade .
+  ```
+
+
+## Missing features?
+
+  If you require new features, please, use the
+  [GitHub Issues Page](https://github.com/soar-telescope/sami/issues).
+  With that, we can have control of the progress of the pipeline.
