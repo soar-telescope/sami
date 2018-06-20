@@ -61,7 +61,7 @@ def main():
     pargs = _parse_arguments()
 
     merge = SamiMerger(
-        bias_file=pargs.bias, clean=pargs.clean, cosmic_rays=pargs.rays,
+        zero_file=pargs.zero, clean=pargs.clean, cosmic_rays=pargs.rays,
         dark_file=pargs.dark, debug=pargs.debug, flat_file=pargs.flat,
         glow_file=pargs.glow, norm_flat=pargs.norm,
         time=pargs.exptime, verbose=not pargs.quiet
@@ -82,8 +82,8 @@ class SamiMerger:
         list_of_files : list
             A list of input files
 
-        bias_file : str
-            The filename of the master bias that will be used in subtraction.
+        zero_file : str
+            The filename of the master zero that will be used in subtraction.
 
         clean : bool
             Clean bad collumns by taking the median value of the pixels around
@@ -117,7 +117,7 @@ class SamiMerger:
         LACosmic - http://www.astro.yale.edu/dokkum/lacosmic/
     """
 
-    def __init__(self, bias_file=None, clean=False,
+    def __init__(self, zero_file=None, clean=False,
                  cosmic_rays=False, dark_file=None, debug=False,
                  flat_file=None, glow_file=None, norm_flat=False,
                  time=False, verbose=False):
@@ -130,7 +130,7 @@ class SamiMerger:
         if debug:
             logger.setLevel("DEBUG")
 
-        self.bias_file = bias_file
+        self.zero_file = zero_file
         self.clean = clean
         self.cosmic_rays = cosmic_rays
         self.dark_file = dark_file
@@ -142,9 +142,9 @@ class SamiMerger:
         return
 
     @staticmethod
-    def bias_subtraction(data, header, prefix, bias_file):
+    def zero_subtraction(data, header, prefix, zero_file):
         """
-        Subtract bias from data.
+        Subtract zero from data.
 
             Parameters
             ----------
@@ -157,17 +157,17 @@ class SamiMerger:
                 prefix : str
                     File prefix that is added after each process.
 
-                bias_file: str | None
+                zero_file: str | None
                     Master Bias filename. If None is given, nothing is done.
         """
         from os.path import abspath
 
-        if bias_file is not None:
-            bias = _pyfits.getdata(abspath(bias_file))
-            data -= bias
-            header['BIASFILE'] = bias_file
+        if zero_file is not None:
+            zero = _pyfits.getdata(abspath(zero_file))
+            data -= zero
+            header['BIASFILE'] = zero_file
             header.add_history('Bias subtracted')
-            prefix = 'b' + prefix
+            prefix = 'z' + prefix
 
         return data, header, prefix
 
@@ -607,19 +607,19 @@ class SamiMerger:
 
             data = fits_file[i].data
             trim = data[ty[0]:ty[1], tx[0]:tx[1]]
-            bias = data[by[0]:by[1], bx[0]:bx[1]]
+            zero = data[by[0]:by[1], bx[0]:bx[1]]
 
-            # Collapse the bias columns to a single column.
-            bias = _np.median(bias, axis=1)
+            # Collapse the zero columns to a single column.
+            zero = _np.median(zero, axis=1)
 
             # Fit and remove OVERSCAN
-            x = _np.arange(bias.size) + 1
-            bias_fit_pars = _np.polyfit(x, bias, 2)  # Last par = inf
-            bias_fit = _np.polyval(bias_fit_pars, x)
-            bias_fit = bias_fit.reshape((bias_fit.size, 1))
-            bias_fit = _np.repeat(bias_fit, trim.shape[1], axis=1)
+            x = _np.arange(zero.size) + 1
+            zero_fit_pars = _np.polyfit(x, zero, 2)  # Last par = inf
+            zero_fit = _np.polyval(zero_fit_pars, x)
+            zero_fit = zero_fit.reshape((zero_fit.size, 1))
+            zero_fit = _np.repeat(zero_fit, trim.shape[1], axis=1)
 
-            trim = trim - bias_fit
+            trim = trim - zero_fit
             dx, dy = slices.iraf2python(fits_file[i].header['DETSEC'])
             dx, dy = dx // bin_size[0], dy // bin_size[1]
             new_data[dy[0]:dy[1], dx[0]:dx[1]] = trim
@@ -633,14 +633,14 @@ class SamiMerger:
         if header['NEXTEND'] == 1:
             return data, header, ''
 
-        prefix = "xj"
+        prefix = "m_"
 
         # Removing bad column and line
         data = self.remove_central_bad_columns(data)
 
         # BIAS subtraction
-        data, header, prefix = self.bias_subtraction(
-            data, header, prefix, self.bias_file
+        data, header, prefix = self.zero_subtraction(
+            data, header, prefix, self.zero_file
         )
 
         # DARK subtraction
@@ -925,7 +925,7 @@ def _parse_arguments():
         description="Join extensions existent in a single FITS file."
     )
 
-    parser.add_argument('-b', '--bias', type=str, default=None,
+    parser.add_argument('-b', '--zero', type=str, default=None,
                         help="Consider BIAS file for subtraction.")
     parser.add_argument('-c', '--clean', action='store_true',
                         help="Clean known bad columns and lines by taking the "
