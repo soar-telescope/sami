@@ -3,14 +3,44 @@
 [![Build Status](https://travis-ci.org/soar-telescope/sami.svg?branch=master)](https://travis-ci.org/soar-telescope/sami)
 [![Coverage Status](https://coveralls.io/repos/github/soar-telescope/sami/badge.svg?branch=master)](https://coveralls.io/github/soar-telescope/sami?branch=master)
 
-
 This is a new pipeline for the SAM Imager using pure Python and
 libraries. At the moment, this pipeline is intended to be used locally
-so a installation have to be performed.
+so a installation have to be performed. As this is an active project, you mind
+find that several features are still to be implemented.
+
+## Install
+
+  The simplest way to use the SAMI Data-Reduction Pipeline is using [astroconda](https://astroconda.readthedocs.io/en/latest/), since it contains most of the packages needed.
+
+  You will still need `astropy:ccdproc`. To do so, activate the `astroconda` virtual environment and install it using the following command:
+
+  ```
+  (my_virtual_env) $ conda install -c astropy ccdproc
+  ```
+
+  Once you have everything, check if you have all the required packages
+  by typing:
+
+  ```
+  (my_virtual_env) path_to_the_samidr $ python setup.py test
+  ```
+
+  If you receive no error, you can install the package using `pip`:
+
+  ```
+  (my_virtual_env) path_to_the_samidr pip install .
+  ```
+
+  If you are updating the SAMI Data-Reduction Pipeline, you must type:
+
+  ```
+  (my_virtual_env) path_to_the_samidr $ pip install --upgrade .
+  ```
 
 ## Features
 
-    * Data Reduction
+* Data Reduction
+* Data Quality
 
 ### Data Reduction
 
@@ -50,43 +80,18 @@ so a installation have to be performed.
  * z : image was **z**ero subtracted.
  * r : **r**emoved cosmic rays form image.
  * f : image was **f**lat fielded.
+ * _ (no prefix) : means that the data was flagged as bad data.
 
-## Install
+### Data Quality
 
-  The simplest way to use the SAMI Data-Reduction Pipeline is using
-  [astroconda](https://astroconda.readthedocs.io/en/latest/), since it
-  contains most of the packages needed.
+ Very basic data quality is performed. At the moment, we know that when some images
+ are completely saturated, they had standard deviation equal to zero. We also know
+ that, sometimes, SAMI cannot write an image and tries again. The first image is
+ also flagged as bad.
 
-  You will still need `astropy:ccdproc`. To do so, activate the
-  `astroconda` virtual environment and install it using the following
-  command:
+ Our experience says that saturated images can have different behaviours. We also know
+ that the images may contain no data where they should. These cases are still not controlled.
 
-  ```
-  (my_virtual_env) $ conda install -c astropy ccdproc
-  ```
+### Missing features?
 
-  Once you have everything, check if you have all the required packages
-  by typing:
-
-  ```
-  (my_virtual_env) path_to_the_samidr $ python setup.py test
-  ```
-
-  If you receive no error, you can install the package using `pip`:
-
-  ```
-  (my_virtual_env) path_to_the_samidr pip install .
-  ```
-
-  If you are updating the SAMI Data-Reduction Pipeline, you must type:
-
-  ```
-  (my_virtual_env) path_to_the_samidr $ pip install --upgrade .
-  ```
-
-
-## Missing features?
-
-  If you require new features, please, use the
-  [GitHub Issues Page](https://github.com/soar-telescope/sami/issues).
-  With that, we can have control of the progress of the pipeline.
+If you require new features, please, use the [GitHub Issues Page](https://github.com/soar-telescope/sami/issues). With that, we can have control of the progress of the pipeline.
