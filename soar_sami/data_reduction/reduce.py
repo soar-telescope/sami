@@ -3,6 +3,7 @@
 
 import ccdproc
 import glob
+import numpy
 import os
 
 from soar_sami.io import pyfits
@@ -29,7 +30,11 @@ def reduce_sami(path):
         try:
             hdu = pyfits.open(_file)
         except OSError:
-            print("[W] Could not read file: {}".format(_file))
+            logger.warning("Could not read file: {}".format(_file))
+            continue
+
+        if numpy.std(hdu[1].data.ravel()) == 0:
+            logger.warning("Bad data found on file: {}".format(_file))
             continue
 
         row = {
