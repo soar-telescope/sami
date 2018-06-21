@@ -26,7 +26,7 @@ def _parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Perform data reduction on images obtained with SAMI."
+        description="SAMI Data-Reduction Pipeline"
     )
 
     parser.add_argument('path', type=str,

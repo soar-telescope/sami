@@ -37,6 +37,21 @@ find that several features are still to be implemented.
   (my_virtual_env) path_to_the_samidr $ pip install --upgrade .
   ```
 
+## Use
+
+  Once installed, the SAMI Data-Reduction Pipeline can be run using a terminal
+  by the following command:
+
+  ```
+  (my_virtual_env) $ reduce_sami $path_to_data
+  ```
+
+  Where `$path_to_data` is the path to the directory that contains SAMI data.
+
+  Note that the pipeline does not perform any type of data quality at the moment
+  so you might check your files to avoid bad data like saturated or empty
+  images.
+
 ## Features
 
 * Data Reduction
