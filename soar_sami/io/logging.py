@@ -3,7 +3,8 @@
 
 import logging
 
-__all__ = ['COLORS', 'get_logger']
+
+__all__ = ['COLORS', 'get_logger', 'MyLogFormatter']
 
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
@@ -20,7 +21,7 @@ COLORS = {
 }
 
 
-def get_logger(logger_name, use_color=True):
+def get_logger(logger_name, use_color=True, overwrite=False):
     """
     Return a logger with the "logger_name".
 
@@ -36,13 +37,11 @@ def get_logger(logger_name, use_color=True):
 
     _logger = logging.getLogger(logger_name)
 
+    formatter = MyLogFormatter(message_format, datefmt=date_format, use_colours=use_color)
+
     if len(_logger.handlers) == 0:
-
-        formatter = MyLogFormatter(message_format, datefmt=date_format, use_colours=use_color)
-
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
-
         _logger.addHandler(handler)
         _logger.setLevel(logging.DEBUG)
 

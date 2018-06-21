@@ -7,17 +7,26 @@ import numpy
 import os
 
 from soar_sami.io import pyfits
-from soar_sami.io.logging import get_logger
+from soar_sami.io.logging import get_logger, MyLogFormatter
 from soar_sami.data_reduction import merge, combine
+
+import logging
 
 __author__ = 'Bruno Quint'
 
-logger = get_logger("sami.data_reduction", use_color=True)
+
+astropy_logger = get_logger('astropy')
+astropy_logger.setLevel('ERROR')
+
+ccdproc_logger = get_logger('ccdproc')
+ccdproc_logger.setLevel('ERROR')
 
 KEYWORDS = ["OBSTYPE", "FILTERS", "CCDSUM"]
 
 
 def reduce_sami(path):
+    
+    logger = get_logger('soar_sami', use_color=True)
 
     sami_merger = merge.SamiMerger()
 
@@ -92,24 +101,32 @@ def reduce_sami(path):
                 pyfits.writeto(zero_file, data, header)
 
                 zero_list_buffer.write('{:s}\n'.format(zero_file))
-                logger.info('Done.')
-
-        logger.info('Done.')
 
         logger.info('Combining ZERO files.')
+
         ic = ccdproc.ImageFileCollection(
             location=os.path.join(path, 'RED'),
             glob_include='*.fits',
             keywords=KEYWORDS
         )
 
+        for h in logger.handlers[:]:
+            logger.removeHandler(h)
+
+        logger.info('1')
+        print(dir(logger))
+
         zero_combine_files = [
             os.path.join(path, 'RED', f)
             for f in ic.files_filtered(obstype='ZERO')
         ]
 
+        logger.info('2')
+
         master_zero_fname = zero_list_name + '.fits'
-        logger.info("Writing master zero to: {}".format(master_zero_fname))       
+        logger.info("Writing master zero to: {}".format(master_zero_fname))
+
+        # print(logging.Logger.manager.loggerDict)
 
         zero_combine = combine.ZeroCombine(
             input_list=zero_combine_files,
@@ -117,6 +134,7 @@ def reduce_sami(path):
         )
 
         zero_combine.run()
+
         logger.info('Done.')
 
         logger.info('Processing FLAT files (SFLAT + DFLAT)')
@@ -164,7 +182,6 @@ def reduce_sami(path):
                     flat_list_buffer.write('{:s}\n'.format(flat_file))
 
                     flat_combine_files.append(flat_file)
-                    logger.info('Done.')
 
             master_flat_fname = flat_list_name + '.fits'
             logger.info('Writing master FLAT to file: {}'.format(
