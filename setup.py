@@ -109,7 +109,7 @@ setup(
     #    ],
     #},
     scripts=[
-        'bin/reduce_sami.py',
+        'bin/reduce_sami',
 ],
 
 )
