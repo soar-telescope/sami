@@ -10,16 +10,19 @@ find that several features are still to be implemented.
 
 ## Install
 
-  The simplest way to use the SAMI Data-Reduction Pipeline is using [astroconda](https://astroconda.readthedocs.io/en/latest/), since it contains most of the packages needed.
-
-  You will still need `astropy:ccdproc`. To do so, activate the `astroconda` virtual environment and install it using the following command:
+  The simplest way to use the SAMI Data-Reduction Pipeline is using [astroconda](https://astroconda.readthedocs.io/en/latest/), since it contains most of the packages needed. Once you have it installed, you can activate the virtual environment by typing:
+  
+  ```
+  $ source activate my_virtual_env
+  ```
+  
+  [astroconda](https://astroconda.readthedocs.io/en/latest/) contains almost all the packages you need to run the SAMI Data-Reduction Pipeline but you will still need `astropy:ccdproc`. To solve this, activate the `astroconda` virtual environment and install it using the following command:
 
   ```
   (my_virtual_env) $ conda install -c astropy ccdproc
   ```
 
-  Once you have everything, check if you have all the required packages
-  by typing:
+  Once you are done, you can download the [SAMI Data-Reduction Pipeline](https://github.com/soar-telescope/sami/archive/master.zip) and extract it somewhere into your computer. Go to where you extracted it and check if you have all the required packages by typing:
 
   ```
   (my_virtual_env) path_to_the_samidr $ python setup.py test
@@ -28,7 +31,7 @@ find that several features are still to be implemented.
   If you receive no error, you can install the package using `pip`:
 
   ```
-  (my_virtual_env) path_to_the_samidr pip install .
+  (my_virtual_env) path_to_the_samidr $ pip install .
   ```
 
   If you are updating the SAMI Data-Reduction Pipeline, you must type:
