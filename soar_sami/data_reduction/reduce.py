@@ -192,6 +192,7 @@ def reduce_sami(path):
             )
 
             obj_files = [row['filename'] for row in sub_table_by_filter]
+            obj_files.sort()
 
             with open(obj_list_name, 'w') as obj_list_buffer:
 
