@@ -3,7 +3,6 @@
 
 import logging
 
-
 __all__ = ['COLORS', 'get_logger', 'MyLogFormatter']
 
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)

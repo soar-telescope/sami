@@ -10,45 +10,43 @@ from soar_sami.io import pyfits
 from soar_sami.io.logging import get_logger, MyLogFormatter
 from soar_sami.data_reduction import merge, combine
 
-import logging
-
-__author__ = 'Bruno Quint'
-
-
 astropy_logger = get_logger('astropy')
-astropy_logger.setLevel('ERROR')
+astropy_logger.setLevel('NOTSET')
 
 ccdproc_logger = get_logger('ccdproc')
-ccdproc_logger.setLevel('ERROR')
+ccdproc_logger.setLevel('NOTSET')
+
+log = get_logger('samidr')
+log.propagate = False
+
+__author__ = 'Bruno Quint'
 
 KEYWORDS = ["OBSTYPE", "FILTERS", "CCDSUM"]
 
 
 def reduce_sami(path):
     
-    logger = get_logger('soar_sami', use_color=True)
-
     sami_merger = merge.SamiMerger()
 
-    logger.info('Creating directory for reduced data: {}'.format(
+    log.info('Creating directory for reduced data: {}'.format(
         os.path.join(path, 'RED')))
 
     os.makedirs(os.path.join(path, "RED"), exist_ok=True)
     list_of_files = glob.glob(os.path.join(path, '*.fits'))
 
 
-    logger.info('Reading raw files')
+    log.info('Reading raw files')
     table = []
     for _file in list_of_files:
 
         try:
             hdu = pyfits.open(_file)
         except OSError:
-            logger.warning("Could not read file: {}".format(_file))
+            log.warning("Could not read file: {}".format(_file))
             continue
 
         if numpy.std(hdu[1].data.ravel()) == 0:
-            logger.warning("Bad data found on file: {}".format(_file))
+            log.warning("Bad data found on file: {}".format(_file))
             continue
 
         row = {
@@ -66,12 +64,12 @@ def reduce_sami(path):
     for row in table:
         if row['binning'] not in list_of_binning:
             list_of_binning.append(row['binning'])
-            logger.info('Found new binning mode: {}'.format(
+            log.info('Found new binning mode: {}'.format(
                 row['binning'][0], row['binning'][1]))
 
     for binning in list_of_binning:
 
-        logger.info('Organizing data.')
+        log.info('Organizing data.')
         sub_table = [row for row in table if row['binning'] == binning]
 
         zero_table = [row for row in sub_table if row['obstype'] == 'ZERO']
@@ -79,7 +77,7 @@ def reduce_sami(path):
         sflat_table = [row for row in sub_table if row['obstype'] == 'SFLAT']
         obj_table = [row for row in sub_table if row['obstype'] == 'OBJECT']
 
-        logger.info('Processing ZERO files')
+        log.info('Processing ZERO files')
         zero_files = [r['filename'] for r in zero_table]
         zero_files.sort()
 
@@ -90,7 +88,7 @@ def reduce_sami(path):
 
             for zero_file in zero_files:
 
-                logger.info('Processing ZERO file: {}'.format(zero_file))
+                log.info('Processing ZERO file: {}'.format(zero_file))
                 data = sami_merger.get_joined_data(zero_file)
                 header = pyfits.getheader(zero_file)
 
@@ -102,31 +100,18 @@ def reduce_sami(path):
 
                 zero_list_buffer.write('{:s}\n'.format(zero_file))
 
-        logger.info('Combining ZERO files.')
+        log.info('Combining ZERO files.')
 
-        ic = ccdproc.ImageFileCollection(
-            location=os.path.join(path, 'RED'),
-            glob_include='*.fits',
-            keywords=KEYWORDS
-        )
-
-        for h in logger.handlers[:]:
-            logger.removeHandler(h)
-
-        logger.info('1')
-        print(dir(logger))
+        ic = ccdproc.ImageFileCollection(location=os.path.join(path, 'RED'),
+                                         glob_include='*.fits',
+                                         keywords=KEYWORDS)
 
         zero_combine_files = [
             os.path.join(path, 'RED', f)
-            for f in ic.files_filtered(obstype='ZERO')
-        ]
-
-        logger.info('2')
+            for f in ic.files_filtered(obstype='ZERO')]
 
         master_zero_fname = zero_list_name + '.fits'
-        logger.info("Writing master zero to: {}".format(master_zero_fname))
-
-        # print(logging.Logger.manager.loggerDict)
+        log.info("Writing master zero to: {}".format(master_zero_fname))
 
         zero_combine = combine.ZeroCombine(
             input_list=zero_combine_files,
@@ -135,19 +120,19 @@ def reduce_sami(path):
 
         zero_combine.run()
 
-        logger.info('Done.')
+        log.info('Done.')
 
-        logger.info('Processing FLAT files (SFLAT + DFLAT)')
+        log.info('Processing FLAT files (SFLAT + DFLAT)')
         flat_table = sflat_table + dflat_table
         filters_used = []
         for row in flat_table:
             if row['filter_id'] not in filters_used:
                 filters_used.append(row['filter_id'])
-                logger.info('Found new filter: {}'.format(row['filter_name']))
+                log.info('Found new filter: {}'.format(row['filter_name']))
 
         for _filter in filters_used:
 
-            logger.info('Processing FLATs for filter: {}'.format(_filter))
+            log.info('Processing FLATs for filter: {}'.format(_filter))
 
             sub_table_by_filter = [
                 row for row in flat_table if row['filter_id'] == _filter
@@ -167,7 +152,7 @@ def reduce_sami(path):
 
                 for flat_file in flat_files:
 
-                    logger.info('Processing FLAT file: {}'.format(flat_file))
+                    log.info('Processing FLAT file: {}'.format(flat_file))
                     sami_merger.zero_file = master_zero_fname
 
                     d = sami_merger.get_joined_data(flat_file)
@@ -184,7 +169,7 @@ def reduce_sami(path):
                     flat_combine_files.append(flat_file)
 
             master_flat_fname = flat_list_name + '.fits'
-            logger.info('Writing master FLAT to file: {}'.format(
+            log.info('Writing master FLAT to file: {}'.format(
                 master_flat_fname))
 
             flat_combine = combine.FlatCombine(
@@ -198,7 +183,7 @@ def reduce_sami(path):
                 row for row in obj_table if row['filter_id'] == _filter
             ]
 
-            logger.info('Processing OBJECT files with filter: {}'.format(
+            log.info('Processing OBJECT files with filter: {}'.format(
                 _filter))
 
             obj_list_name = os.path.join(
@@ -212,7 +197,7 @@ def reduce_sami(path):
 
                 for obj_file in obj_files:
 
-                    logger.info('Processing OBJECT file: {}'.format(obj_file))
+                    log.info('Processing OBJECT file: {}'.format(obj_file))
                     sami_merger.zero_file = master_zero_fname
                     sami_merger.flat_file = master_flat_fname
                     sami_merger.cosmic_rays = True
@@ -227,7 +212,6 @@ def reduce_sami(path):
                     pyfits.writeto(obj_file, d, h)
 
                     obj_list_buffer.write('\n'.format(obj_file))
-                    logger.info('Done.')
 
-            logger.info('All done.')
+            log.info('All done.')
 
