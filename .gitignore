@@ -2,3 +2,7 @@
 .cache/
 .coverage
 *.egg-info
+
+build
+dist
+soar_sami.egg-info
