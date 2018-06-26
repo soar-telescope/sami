@@ -53,7 +53,7 @@ def reduce_sami(path):
             'filename': _file,
             'obstype': hdu[0].header['obstype'],
             'filter_id': hdu[0].header['filters'],
-            'filter_name': hdu[0].header['filters'],
+            'filter_name': hdu[0].header['filter1'],
             'binning': [
                 int(b) for b in hdu[1].header['ccdsum'].strip().split(' ')]
         }
