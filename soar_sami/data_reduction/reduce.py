@@ -180,42 +180,48 @@ def reduce_sami(path):
 
             flat_combine.run()
 
-        # for _filter in filters_used:
-        #
-        #     sub_table_by_filter = [
-        #         row for row in obj_table if row['filter_id'] == _filter
-        #     ]
-        #
-        #     log.info('Processing OBJECT files with filter: {}'.format(
-        #         _filter))
-        #
-        #     obj_list_name = os.path.join(
-        #         path, 'RED',
-        #         "2OBJECT_{}x{}_{}".format(binning[0], binning[1], _filter)
-        #     )
-        #
-        #     obj_files = [row['filename'] for row in sub_table_by_filter]
-        #     obj_files.sort()
-        #
-        #     with open(obj_list_name, 'w') as obj_list_buffer:
-        #
-        #         for obj_file in obj_files:
-        #
-        #             log.info('Processing OBJECT file: {}'.format(obj_file))
-        #             sami_merger.zero_file = master_zero_fname
-        #             sami_merger.flat_file = master_flat_fname
-        #             sami_merger.cosmic_rays = True
-        #
-        #             d = sami_merger.get_joined_data(obj_file)
-        #             h = pyfits.getheader(obj_file)
-        #
-        #             d, h, p = sami_merger.join_and_process(d, h)
-        #
-        #             path, fname = os.path.split(obj_file)
-        #             obj_file = os.path.join(path, 'RED', p + fname)
-        #             pyfits.writeto(obj_file, d, h)
-        #
-        #             obj_list_buffer.write('\n'.format(obj_file))
-        #
-        #     log.info('All done.')
-        #
+        for _filter in filters_used:
+
+            master_flat_fname = os.path.join(
+                path, 'RED',
+                "1FLAT_{}x{}_{}.fits".format(binning[0], binning[1], _filter)
+            )
+
+            sami_merger.zero_file = master_zero_fname
+            sami_merger.flat_file = master_flat_fname
+            sami_merger.cosmic_rays = True
+
+            sub_table_by_filter = [
+                row for row in obj_table if row['filter_id'] == _filter
+            ]
+
+            log.info('Processing OBJECT files with filter: {}'.format(
+                _filter))
+
+            obj_list_name = os.path.join(
+                path, 'RED',
+                "2OBJECT_{}x{}_{}".format(binning[0], binning[1], _filter)
+            )
+
+            obj_files = [row['filename'] for row in sub_table_by_filter]
+            obj_files.sort()
+
+            with open(obj_list_name, 'w') as obj_list_buffer:
+
+                for obj_file in obj_files:
+
+                    log.info('Processing OBJECT file: {}'.format(obj_file))
+
+                    d = sami_merger.get_joined_data(obj_file)
+                    h = pyfits.getheader(obj_file)
+
+                    d, h, p = sami_merger.join_and_process(d, h)
+
+                    path, fname = os.path.split(obj_file)
+                    obj_file = os.path.join(path, 'RED', p + fname)
+                    pyfits.writeto(obj_file, d, h)
+
+                    obj_list_buffer.write('\n'.format(obj_file))
+
+        log.info('All done.')
+
