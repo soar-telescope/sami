@@ -153,7 +153,9 @@ def reduce_sami(path):
                 for flat_file in flat_files:
 
                     log.info('Processing FLAT file: {}'.format(flat_file))
+                    sami_merger.flat_file = None
                     sami_merger.zero_file = master_zero_fname
+
 
                     d = sami_merger.get_joined_data(flat_file)
                     h = pyfits.getheader(flat_file)
