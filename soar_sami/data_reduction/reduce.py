@@ -257,6 +257,16 @@ def reduce_sami(path):
 
                 for obj_file in obj_files:
 
+                    path, fname = os.path.split(obj_file)
+                    prefix = sami_merger.get_prefix()
+                    output_obj_file = os.path.join(path, 'RED', prefix + fname)
+
+                    if os.path.exists(output_obj_file):
+                        log.warning('Skipping existing OBJECT file: {}'.format(
+                            output_obj_file
+                        ))
+                        continue
+
                     log.info('Processing OBJECT file: {}'.format(obj_file))
 
                     d = sami_merger.get_joined_data(obj_file)
@@ -265,9 +275,7 @@ def reduce_sami(path):
 
                     d, h, p = sami_merger.join_and_process(d, h)
 
-                    path, fname = os.path.split(obj_file)
-                    obj_file = os.path.join(path, 'RED', p + fname)
-                    pyfits.writeto(obj_file, d, h)
+                    pyfits.writeto(output_obj_file, d, h)
 
                     obj_list_buffer.write('\n'.format(obj_file))
 
