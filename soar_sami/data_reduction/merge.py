@@ -37,6 +37,9 @@ from ccdproc import cosmicray_lacosmic as _cosmicray_lacosmic
 from numpy import random
 from scipy import stats
 
+from astropy import wcs
+from astropy.coordinates import SkyCoord
+from astropy import units as u
 from soar_sami.io.logging import get_logger
 from soar_sami.tools import slices, version
 
@@ -142,34 +145,67 @@ class SamiMerger:
         return
 
     @staticmethod
-    def zero_subtraction(data, header, prefix, zero_file):
+    def add_wcs(data, header):
         """
-        Subtract zero from data.
+        Creates a first guess of the WCS using the telescope coordinates, the
+        CCDSUM (binning), position angle and plate scale.
 
-            Parameters
-            ----------
-                data : numpy.ndarray
-                    A 2D numpy array that contains the data.
+        Parameters
+        ----------
+            data : numpy.ndarray
+                2D array with the data.
 
-                header : astropy.io.fits.Header
-                    A header that will be updated.
+            header : astropy.io.fits.Header
+                Primary Header to be updated.
 
-                prefix : str
-                    File prefix that is added after each process.
-
-                zero_file: str | None
-                    Master Bias filename. If None is given, nothing is done.
+        Returns
+        -------
+            header : astropy.io.fits.Header
+                Primary Header with updated WCS information.
         """
-        from os.path import abspath
+        h = header
 
-        if zero_file is not None:
-            zero = _pyfits.getdata(abspath(zero_file))
-            data -= zero
-            header['BIASFILE'] = zero_file
-            header.add_history('Bias subtracted')
-            prefix = 'z' + prefix
+        if 'EQUINOX' not in h:
+            h['EQUINOX'] = 2000.
 
-        return data, header, prefix
+        if 'EPOCH' not in h:
+            h['EPOCH'] = 2000.
+
+        if h['PIXSCAL1'] != h['PIXSCAL2']:
+            logger.warning('Pixel scales for X and Y do not mach.')
+
+        binning = _np.array([int(b) for b in h['CCDSUM'].split(' ')])
+        plate_scale = h['PIXSCAL1'] * u.arcsec
+        p = plate_scale.to('degree').value
+
+        _np.testing.assert_almost_equal(p, 1.2639e-5)
+
+        w = wcs.WCS(naxis=2)
+
+        coordinates = SkyCoord(ra=h['RA'], dec=h['DEC'],
+                               unit=(u.hourangle, u.deg))
+
+        ra = coordinates.ra.to('degree').value
+        dec = coordinates.dec.to('degree').value
+
+        w.wcs.crpix = [data.shape[1] / 2, data.shape[0] / 2]
+        w.wcs.cdelt = p * binning
+        w.wcs.crval = [ra, dec]
+        w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+        # w.wcs.set_pv([(2, 1, 45.0)])
+
+        wcs_header = w.to_header()
+
+        theta = _np.deg2rad(h['DECPANGL'])
+        wcs_header['cd1_1'] = p * binning[0] * _np.cos(theta)
+        wcs_header['cd2_2'] = p * binning[0] * _np.cos(theta)
+        wcs_header['cd1_2'] = p * binning[0] * _np.sin(theta)
+        wcs_header['cd2_1'] = - p * binning[0] * _np.sin(theta)
+
+        for key in wcs_header.keys():
+            header[key] = wcs_header[key]
+
+        return header
 
     @staticmethod
     def clean_column(_data, x0, y0, yf, n=5):
@@ -540,7 +576,7 @@ class SamiMerger:
         h1 = fits_file[1].header
 
         h0.append('UNITS')
-        h0.set('UNITS', value='COUNTS', comment='Pixel intensity units.')
+        h0.set('UNITS', value='ADU', comment='Pixel intensity units.')
 
         # Save the CCD binning in the main header
         h0['CCDSUM'] = h1['CCDSUM']
@@ -625,6 +661,29 @@ class SamiMerger:
             new_data[dy[0]:dy[1], dx[0]:dx[1]] = trim
 
         return new_data
+
+    def get_prefix(self):
+        """
+        Return a prefix to be added to the file deppending on the data
+        reduction steps.
+
+        Returns
+        -------
+            prefix : (str)
+                The prefix that can be used.
+                    m = merged amplifiers.
+                    z = zero subtracted.
+                    f = flat corrected.
+        """
+        prefix = 'm_'
+
+        if self.zero_file:
+            prefix = 'z' + prefix
+
+        if self.flat_file:
+            prefix = 'f' + prefix
+
+        return prefix
 
     def join_and_process(self, data, header):
 
@@ -721,7 +780,7 @@ class SamiMerger:
             header.set('BUNIT', 'adu')
             header.add_history(
                 'Cosmic rays and hot pixels removed using LACosmic')
-            prefix = 'r' + prefix
+            # prefix = 'r' + prefix
 
         return data, header, prefix
 
@@ -865,6 +924,9 @@ class SamiMerger:
             # Build header
             header = self.get_header(filename)
 
+            # Add WCS
+            header = self.add_wcs(header)
+
             # Join and process data
             data, header, prefix = self.join_and_process(data, header)
 
@@ -883,6 +945,36 @@ class SamiMerger:
 
         logger.info("")
         logger.info("All done!")
+
+    @staticmethod
+    def zero_subtraction(data, header, prefix, zero_file):
+        """
+        Subtract zero from data.
+
+            Parameters
+            ----------
+                data : numpy.ndarray
+                    A 2D numpy array that contains the data.
+
+                header : astropy.io.fits.Header
+                    A header that will be updated.
+
+                prefix : str
+                    File prefix that is added after each process.
+
+                zero_file: str | None
+                    Master Bias filename. If None is given, nothing is done.
+        """
+        from os.path import abspath
+
+        if zero_file is not None:
+            zero = _pyfits.getdata(abspath(zero_file))
+            data -= zero
+            header['BIASFILE'] = zero_file
+            header.add_history('Bias subtracted')
+            prefix = 'z' + prefix
+
+        return data, header, prefix
 
 
 def _normalize_data(data):

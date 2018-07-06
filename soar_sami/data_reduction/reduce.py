@@ -7,7 +7,8 @@ import numpy
 import os
 
 from soar_sami.io import pyfits
-from soar_sami.io.logging import get_logger, MyLogFormatter
+from soar_sami.io.logging import get_logger
+from soar_sami.tools import version
 from soar_sami.data_reduction import merge, combine
 
 astropy_logger = get_logger('astropy')
@@ -25,15 +26,20 @@ KEYWORDS = ["OBSTYPE", "FILTERS", "CCDSUM"]
 
 
 def reduce_sami(path):
-    
+
+    log.info('SAMI Data-Reduction Pipeline')
+    log.info('Version {}'.format(version.__str__))
+
     sami_merger = merge.SamiMerger()
 
-    log.info('Creating directory for reduced data: {}'.format(
-        os.path.join(path, 'RED')))
+    reduced_path = os.path.join(path, 'RED')
+    if os.path.exists(reduced_path):
+        log.warning('Skipping existing directory: {}'.format(reduced_path))
+    else:
+        log.info('Creating directory for reduced data: {}'.format(reduced_path))
 
     os.makedirs(os.path.join(path, "RED"), exist_ok=True)
     list_of_files = glob.glob(os.path.join(path, '*.fits'))
-
 
     log.info('Reading raw files')
     table = []
@@ -88,44 +94,69 @@ def reduce_sami(path):
 
             for zero_file in zero_files:
 
+                sami_merger.zero_file = None
+                sami_merger.flat_file = None
+
+                path, fname = os.path.split(zero_file)
+                prefix = sami_merger.get_prefix()
+                output_zero_file = os.path.join(path, 'RED', prefix + fname)
+
+                if os.path.exists(output_zero_file):
+                    log.warning('Skipping existing file: {}'.format(
+                        output_zero_file))
+                    continue
+
                 log.info('Processing ZERO file: {}'.format(zero_file))
+
                 data = sami_merger.get_joined_data(zero_file)
                 header = pyfits.getheader(zero_file)
 
                 data, header, prefix = sami_merger.join_and_process(data, header)
-
-                path, fname = os.path.split(zero_file)
-                zero_file = os.path.join(path, 'RED', prefix + fname)
-                pyfits.writeto(zero_file, data, header)
+                pyfits.writeto(output_zero_file, data, header)
 
                 zero_list_buffer.write('{:s}\n'.format(zero_file))
 
         log.info('Combining ZERO files.')
 
-        ic = ccdproc.ImageFileCollection(location=os.path.join(path, 'RED'),
-                                         glob_include='*.fits',
-                                         keywords=KEYWORDS)
-
-        zero_combine_files = [
-            os.path.join(path, 'RED', f)
-            for f in ic.files_filtered(obstype='ZERO')]
-
         master_zero_fname = zero_list_name + '.fits'
-        log.info("Writing master zero to: {}".format(master_zero_fname))
 
-        zero_combine = combine.ZeroCombine(
-            input_list=zero_combine_files,
-            output_file=master_zero_fname
-        )
+        if os.path.exists(master_zero_fname):
 
-        zero_combine.run()
+            log.warning('Skipping existing MASTER ZERO: {:s}'.format(
+                master_zero_fname
+            ))
 
-        log.info('Done.')
+        else:
+
+            ic = ccdproc.ImageFileCollection(
+                location=os.path.join(path, 'RED'),
+                glob_include='*.fits',
+                keywords=KEYWORDS
+            )
+
+            zero_combine_files = [
+                os.path.join(path, 'RED', f)
+                    for f in ic.files_filtered(obstype='ZERO')
+            ]
+
+            log.info("Writing master zero to: {}".format(
+                master_zero_fname)
+            )
+
+            zero_combine = combine.ZeroCombine(
+                input_list=zero_combine_files,
+                output_file=master_zero_fname
+            )
+
+            zero_combine.run()
+
+            log.info('Done.')
 
         log.info('Processing FLAT files (SFLAT + DFLAT)')
-        flat_table = sflat_table + dflat_table
+
+        all_flats = sflat_table + dflat_table
         filters_used = []
-        for row in flat_table:
+        for row in all_flats:
             if row['filter_id'] not in filters_used:
                 filters_used.append(row['filter_id'])
                 log.info('Found new filter: {}'.format(row['filter_name']))
@@ -135,7 +166,7 @@ def reduce_sami(path):
             log.info('Processing FLATs for filter: {}'.format(_filter))
 
             sub_table_by_filter = [
-                row for row in flat_table if row['filter_id'] == _filter
+                row for row in all_flats if row['filter_id'] == _filter
             ]
 
             flat_list_name = os.path.join(
@@ -152,33 +183,49 @@ def reduce_sami(path):
 
                 for flat_file in flat_files:
 
-                    log.info('Processing FLAT file: {}'.format(flat_file))
                     sami_merger.zero_file = master_zero_fname
                     sami_merger.flat_file = None
+                    prefix = sami_merger.get_prefix()
+
+                    path, fname = os.path.split(flat_file)
+                    output_flat_file = os.path.join(path, 'RED', prefix + fname)
+
+                    if os.path.exists(os.path.join(path, output_flat_file)):
+                        log.warning('Skipping existing FLAT file: {}'.format(
+                            output_flat_file
+                        ))
+                        continue
+
+                    log.info('Processing FLAT file: {}'.format(flat_file))
 
                     d = sami_merger.get_joined_data(flat_file)
                     h = pyfits.getheader(flat_file)
 
                     d, h, p = sami_merger.join_and_process(d, h)
+                    pyfits.writeto(output_flat_file, d, h)
 
-                    path, fname = os.path.split(flat_file)
-                    flat_file = os.path.join(path, 'RED', p + fname)
-                    pyfits.writeto(flat_file, d, h)
+                    flat_list_buffer.write('{:s}\n'.format(output_flat_file))
 
-                    flat_list_buffer.write('{:s}\n'.format(flat_file))
-
-                    flat_combine_files.append(flat_file)
+                    flat_combine_files.append(output_flat_file)
 
             master_flat_fname = flat_list_name + '.fits'
-            log.info('Writing master FLAT to file: {}'.format(
-                master_flat_fname))
 
-            flat_combine = combine.FlatCombine(
-                 input_list=flat_combine_files,
-                 output_file=master_flat_fname
-            )
+            if os.path.exists(master_flat_fname):
 
-            flat_combine.run()
+                log.warning('Skipping existing MASTER FLAT: {:s}'.format(
+                    master_flat_fname))
+
+            else:
+
+                log.info('Writing master FLAT to file: {}'.format(
+                    master_flat_fname))
+
+                flat_combine = combine.FlatCombine(
+                     input_list=flat_combine_files,
+                     output_file=master_flat_fname
+                )
+
+                flat_combine.run()
 
         for _filter in filters_used:
 
@@ -213,7 +260,8 @@ def reduce_sami(path):
                     log.info('Processing OBJECT file: {}'.format(obj_file))
 
                     d = sami_merger.get_joined_data(obj_file)
-                    h = pyfits.getheader(obj_file)
+                    h = sami_merger.get_header(obj_file)
+                    h = sami_merger.add_wcs(d, h)
 
                     d, h, p = sami_merger.join_and_process(d, h)
 

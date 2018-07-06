@@ -109,6 +109,7 @@ setup(
     #},
     scripts=[
         'bin/reduce_sami',
+        'bin/sami_autoastrometry',
 ],
 
 )
