@@ -182,8 +182,18 @@ class SamiMerger:
 
         w = wcs.WCS(naxis=2)
 
-        coordinates = SkyCoord(ra=h['RA'], dec=h['DEC'],
-                               unit=(u.hourangle, u.deg))
+        try:
+            coordinates = SkyCoord(ra=h['RA'], dec=h['DEC'],
+                                   unit=(u.hourangle, u.deg))
+
+        except ValueError:
+
+            logger.error(
+                '"RA" and "DEC" missing. Using "TELRA" and "TELDEC" instead.')
+
+            coordinates = SkyCoord(ra=h['TELRA'], dec=h['TELDEC'],
+                                   unit=(u.hourangle, u.deg))
+
 
         ra = coordinates.ra.to('degree').value
         dec = coordinates.dec.to('degree').value
