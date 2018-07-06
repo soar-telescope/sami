@@ -10,7 +10,9 @@ v0.1.3 - Fixed bug that prevented reducing some filters.
        - At some point, it is useful to have the full filter name.
 v0.1.4 - Skipping existing ZERO and FLAT frames.
        - WCS is added to objects when merging amplifiers.
-v0.1.5 - sami_autoastrometry fixed (AGAIN!!)
+v0.1.5 - sami_autoastrometry fixed (AGAIN!!).
+       - Added try/except for missing RA/DEC.
+       - Skipping existing object files.
 """
 import calendar
 
@@ -22,4 +24,4 @@ month = 7
 year = 2018
 
 month = calendar.month_name[month]
-__str__ = "{api:d}.{feature:d}.{bug:d} - {month:d}, {year:d}".format(**locals())
+__str__ = "{api:d}.{feature:d}.{bug:d} - {month:s}, {year:d}".format(**locals())
