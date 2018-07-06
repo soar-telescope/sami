@@ -8,11 +8,13 @@ v0.1.1 - Fixed bug related to master bias and flat names.
 v0.1.2 - Fixed bug related to the logging system.
 v0.1.3 - Fixed bug that prevented reducing some filters.
        - At some point, it is useful to have the full filter name.
+v0.1.4 - Skipping existing ZERO and FLAT frames.
+       - WCS is added to objects when merging amplifiers.
 """
 
 api = 0
 feature = 1
-bug = 3
+bug = 4
 
 month = 6
 year = 2018
