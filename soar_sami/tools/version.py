@@ -10,13 +10,16 @@ v0.1.3 - Fixed bug that prevented reducing some filters.
        - At some point, it is useful to have the full filter name.
 v0.1.4 - Skipping existing ZERO and FLAT frames.
        - WCS is added to objects when merging amplifiers.
+v0.1.5 - sami_autoastrometry fixed (AGAIN!!)
 """
+import calendar
 
 api = 0
 feature = 1
-bug = 4
+bug = 5
 
-month = 6
+month = 7
 year = 2018
 
-__str__ = "{api:d}.{feature:d}.{bug:d} {month:d}, {year:d}".format(**locals())
+month = calendar.month_name[month]
+__str__ = "{api:d}.{feature:d}.{bug:d} - {month:d}, {year:d}".format(**locals())
