@@ -2,6 +2,7 @@
 # -*- coding: utf8 -*-
 
 import ccdproc
+import pandas as pd
 import glob
 import numpy
 import os
@@ -25,24 +26,33 @@ __author__ = 'Bruno Quint'
 KEYWORDS = ["OBSTYPE", "FILTERS", "CCDSUM"]
 
 
-def reduce_sami(path):
+def build_table(list_of_files):
+    """
+    Return a pandas.DataFrame used to organize the pipeline.
 
-    log.info('SAMI Data-Reduction Pipeline')
-    log.info('Version {}'.format(version.__str__))
+    Args:
+        list_of_files (list) : list of files to be included in the dataframe.
 
-    sami_merger = merge.SamiMerger()
-
-    reduced_path = os.path.join(path, 'RED')
-    if os.path.exists(reduced_path):
-        log.warning('Skipping existing directory: {}'.format(reduced_path))
-    else:
-        log.info('Creating directory for reduced data: {}'.format(reduced_path))
-
-    os.makedirs(os.path.join(path, "RED"), exist_ok=True)
-    list_of_files = glob.glob(os.path.join(path, '*.fits'))
-
+    Returns:
+        table (pandas.Dataframe) : a dataframe with information needed for the
+        pipeline.
+    """
     log.info('Reading raw files')
-    table = []
+
+    table = pd.DataFrame(
+        columns=[
+            'filename',
+            'obstype',
+            'filters',
+            'filter1',
+            'filter2',
+            'binning',
+            'flat_file',
+            'zero_file',
+        ]
+    )
+
+    list_of_files.sort()
     for _file in list_of_files:
 
         try:
@@ -55,16 +65,52 @@ def reduce_sami(path):
             log.warning("Bad data found on file: {}".format(_file))
             continue
 
-        row = {
+        row = pd.Series(data={
             'filename': _file,
             'obstype': hdu[0].header['obstype'],
-            'filter_id': hdu[0].header['filters'],
-            'filter_name': hdu[0].header['filter1'],
-            'binning': [
-                int(b) for b in hdu[1].header['ccdsum'].strip().split(' ')]
-        }
+            'filters': hdu[0].header['filters'],
+            'filter1': hdu[0].header['filter1'],
+            'filter2': hdu[0].header['filter2'],
+            'binning': hdu[1].header['ccdsum'].strip(),
+            'flat_file': None,
+            'zero_file': None,
+        })
 
-        table.append(row)
+        table = table.append(row, ignore_index=True, sort=True)
+
+    return table
+
+
+def create_reduced_folder(path):
+    """
+    Check if directory that will host the processed data exists or not. If not,
+    creates it.
+
+    Args:
+        path (str) : string with the directory for processed data.
+    """
+
+    if os.path.exists(path):
+        log.warning('Skipping existing directory: {}'.format(path))
+    else:
+        log.info('Creating directory for reduced data: {}'.format(path))
+
+    os.makedirs(path, exist_ok=True)
+
+    return path
+
+
+def get_binning_used(table):
+    """
+    Get all the binning modes used during the observation night.
+
+    Args:
+        table (pandas.DataFrame) : table used in the pipeline.
+
+    Returns:
+        list_of_binning (list) : list with the different binning used during
+        observation.
+    """
 
     list_of_binning = []
     for row in table:
@@ -73,211 +119,257 @@ def reduce_sami(path):
             log.info('Found new binning mode: {}'.format(
                 row['binning'][0], row['binning'][1]))
 
-    for binning in list_of_binning:
+    return list_of_binning
 
-        log.info('Organizing data.')
-        sub_table = [row for row in table if row['binning'] == binning]
 
-        zero_table = [row for row in sub_table if row['obstype'] == 'ZERO']
-        dflat_table = [row for row in sub_table if row['obstype'] == 'DFLAT']
-        sflat_table = [row for row in sub_table if row['obstype'] == 'SFLAT']
-        obj_table = [row for row in sub_table if row['obstype'] == 'OBJECT']
+def process_flat_files(df, red_path):
+    """
+    Args:
+        df (pandas.DataFrame) : a data-frame containing the all the data being
+        processed.
+        red_path (str) : the path where the reduced data is stored.
 
-        log.info('Processing ZERO files')
-        zero_files = [r['filename'] for r in zero_table]
-        zero_files.sort()
+    Returns:
+        updated_table (pandas.DataFrame) : an updated data-frame where each
+        file now is attached to the corresponding master Zero file.
+    """
+    log.info('Processing FLAT files (SFLAT + DFLAT)')
+    sami_merger = merge.SamiMerger()
 
-        zero_list_name = os.path.join(
-            path, "RED", "0Zero{}x{}".format(binning[0], binning[1]))
+    binning = df.binning.unique()
 
-        with open(zero_list_name, 'w') as zero_list_buffer:
+    for b in binning:
 
-            for zero_file in zero_files:
+        bx, by = b.split(' ')
+        log.info('Processing FLAT files with binning: {} x {}'.format(bx, by))
 
-                sami_merger.zero_file = None
-                sami_merger.flat_file = None
+        mask1 = (df.obstype.values == 'SFLAT') | (df.obstype.values == 'DFLAT')
+        mask2 = df.binning.values == b
+        flat_df = df.loc[mask1 & mask2]
 
-                path, fname = os.path.split(zero_file)
-                prefix = sami_merger.get_prefix()
-                output_zero_file = os.path.join(path, 'RED', prefix + fname)
-
-                if os.path.exists(output_zero_file):
-                    log.warning('Skipping existing file: {}'.format(
-                        output_zero_file))
-                    continue
-
-                log.info('Processing ZERO file: {}'.format(zero_file))
-
-                data = sami_merger.get_joined_data(zero_file)
-                header = pyfits.getheader(zero_file)
-
-                data, header, prefix = sami_merger.join_and_process(data, header)
-                pyfits.writeto(output_zero_file, data, header)
-
-                zero_list_buffer.write('{:s}\n'.format(zero_file))
-
-        log.info('Combining ZERO files.')
-
-        master_zero_fname = zero_list_name + '.fits'
-
-        if os.path.exists(master_zero_fname):
-
-            log.warning('Skipping existing MASTER ZERO: {:s}'.format(
-                master_zero_fname
-            ))
-
-        else:
-
-            ic = ccdproc.ImageFileCollection(
-                location=os.path.join(path, 'RED'),
-                glob_include='*.fits',
-                keywords=KEYWORDS
-            )
-
-            zero_combine_files = [
-                os.path.join(path, 'RED', f)
-                    for f in ic.files_filtered(obstype='ZERO')
-            ]
-
-            log.info("Writing master zero to: {}".format(
-                master_zero_fname)
-            )
-
-            zero_combine = combine.ZeroCombine(
-                input_list=zero_combine_files,
-                output_file=master_zero_fname
-            )
-
-            zero_combine.run()
-
-            log.info('Done.')
-
-        log.info('Processing FLAT files (SFLAT + DFLAT)')
-
-        all_flats = sflat_table + dflat_table
-        filters_used = []
-        for row in all_flats:
-            if row['filter_id'] not in filters_used:
-                filters_used.append(row['filter_id'])
-                log.info('Found new filter: {}'.format(row['filter_name']))
+        filters_used = flat_df.filters.unique()
 
         for _filter in filters_used:
 
             log.info('Processing FLATs for filter: {}'.format(_filter))
 
-            sub_table_by_filter = [
-                row for row in all_flats if row['filter_id'] == _filter
-            ]
+            filter_flat_df = flat_df.loc[flat_df.filters.values == _filter]
+            filter_flat_df.sort_values('filename')
+
+            log.info(
+                'Filter Wheel 1: {}'.format(filter_flat_df.filter1.unique()[0]))
+
+            log.info(
+                'Filter Wheel 2: {}'.format(filter_flat_df.filter2.unique()[0]))
+
+            flat_list = []
+            for index, row in filter_flat_df.iterrows():
+
+                sami_merger.zero_file = row.zero_file
+                sami_merger.flat_file = None
+                flat_file = row.filename
+                prefix = sami_merger.get_prefix()
+
+                path, fname = os.path.split(flat_file)
+                output_flat = os.path.join(red_path, prefix + fname)
+                flat_list.append(prefix + fname)
+
+                if os.path.exists(output_flat):
+                    log.warning(
+                        'Skipping existing FLAT file: {}'.format(output_flat))
+                    continue
+
+                log.info('Processing FLAT file: {}'.format(flat_file))
+
+                d = sami_merger.get_joined_data(flat_file)
+                h = pyfits.getheader(flat_file)
+
+                d, h, p = sami_merger.join_and_process(d, h)
+                pyfits.writeto(output_flat, d, h)
 
             flat_list_name = os.path.join(
-                path, 'RED',
-                "1FLAT_{}x{}_{}".format(binning[0], binning[1], _filter)
-            )
-
-            flat_files = [row['filename'] for row in sub_table_by_filter]
-            flat_files.sort()
-
-            flat_combine_files = []
+                red_path, "1FLAT_{}x{}_{}".format(bx, by, _filter))
 
             with open(flat_list_name, 'w') as flat_list_buffer:
+                for flat_file in flat_list:
+                    flat_list_buffer.write('{:s}\n'.format(flat_file))
 
-                for flat_file in flat_files:
+            master_flat = flat_list_name + '.fits'
 
-                    sami_merger.zero_file = master_zero_fname
-                    sami_merger.flat_file = None
-                    prefix = sami_merger.get_prefix()
-
-                    path, fname = os.path.split(flat_file)
-                    output_flat_file = os.path.join(path, 'RED', prefix + fname)
-
-                    if os.path.exists(os.path.join(path, output_flat_file)):
-                        log.warning('Skipping existing FLAT file: {}'.format(
-                            output_flat_file
-                        ))
-                        continue
-
-                    log.info('Processing FLAT file: {}'.format(flat_file))
-
-                    d = sami_merger.get_joined_data(flat_file)
-                    h = pyfits.getheader(flat_file)
-
-                    d, h, p = sami_merger.join_and_process(d, h)
-                    pyfits.writeto(output_flat_file, d, h)
-
-                    flat_list_buffer.write('{:s}\n'.format(output_flat_file))
-
-                    flat_combine_files.append(output_flat_file)
-
-            master_flat_fname = flat_list_name + '.fits'
-
-            if os.path.exists(master_flat_fname):
-
-                log.warning('Skipping existing MASTER FLAT: {:s}'.format(
-                    master_flat_fname))
-
+            if os.path.exists(master_flat):
+                log.warning(
+                    'Skipping existing MASTER FLAT: {:s}'.format(master_flat))
             else:
+                log.info('Writing master FLAT to file: {}'.format(master_flat))
 
-                log.info('Writing master FLAT to file: {}'.format(
-                    master_flat_fname))
+            flat_combine_files = [os.path.join(red_path, f) for f in flat_list]
 
-                flat_combine = combine.FlatCombine(
-                     input_list=flat_combine_files,
-                     output_file=master_flat_fname
-                )
+            flat_combine = combine.FlatCombine(
+                 input_list=flat_combine_files, output_file=master_flat)
 
-                flat_combine.run()
+            flat_combine.run()
 
-        for _filter in filters_used:
+            mask1 = df['obstype'].values == 'OBJECT'
+            mask2 = df['binning'].values == b
+            df.loc[mask1 & mask2, 'flat_file'] = master_flat
 
-            master_flat_fname = os.path.join(
-                path, 'RED',
-                "1FLAT_{}x{}_{}.fits".format(binning[0], binning[1], _filter)
-            )
+    return df
 
-            sami_merger.zero_file = master_zero_fname
-            sami_merger.flat_file = master_flat_fname
-            sami_merger.cosmic_rays = True
 
-            sub_table_by_filter = [
-                row for row in obj_table if row['filter_id'] == _filter
-            ]
+def process_object_files(df, red_path):
+    """
+    Args:
+        df (pandas.DataFrame) : a data-frame containing the all the data being
+        processed.
+        red_path (str) : the path where the reduced data is stored.
 
-            log.info('Processing OBJECT files with filter: {}'.format(
-                _filter))
+    Returns:
+        updated_table (pandas.DataFrame) : an updated data-frame where each
+        file now is attached to the corresponding master Zero file.
+    """
+    sami_merger = merge.SamiMerger()
+    sami_merger.cosmic_rays = True
 
-            obj_list_name = os.path.join(
-                path, 'RED',
-                "2OBJECT_{}x{}_{}".format(binning[0], binning[1], _filter)
-            )
+    log.info('Processing OBJECT files.')
 
-            obj_files = [row['filename'] for row in sub_table_by_filter]
-            obj_files.sort()
+    object_df = df.loc[df.obstype.values == 'OBJECT']
 
-            with open(obj_list_name, 'w') as obj_list_buffer:
+    for index, row in object_df.iterrows():
 
-                for obj_file in obj_files:
+        sami_merger.zero_file = row.zero_file
+        sami_merger.flat_file = row.flat_file
+        obj_file = row.filename
 
-                    path, fname = os.path.split(obj_file)
-                    prefix = sami_merger.get_prefix()
-                    output_obj_file = os.path.join(path, 'RED', prefix + fname)
+        path, fname = os.path.split(obj_file)
+        prefix = sami_merger.get_prefix()
+        output_obj_file = os.path.join(path, 'RED', prefix + fname)
 
-                    if os.path.exists(output_obj_file):
-                        log.warning('Skipping existing OBJECT file: {}'.format(
-                            output_obj_file
-                        ))
-                        continue
+        if os.path.exists(output_obj_file):
+            log.warning(
+                'Skipping existing OBJECT file: {}'.format(output_obj_file))
+            continue
 
-                    log.info('Processing OBJECT file: {}'.format(obj_file))
+        log.info('Processing OBJECT file: {}'.format(obj_file))
 
-                    d = sami_merger.get_joined_data(obj_file)
-                    h = sami_merger.get_header(obj_file)
-                    h = sami_merger.add_wcs(d, h)
+        d = sami_merger.get_joined_data(obj_file)
+        h = sami_merger.get_header(obj_file)
+        h = sami_merger.add_wcs(d, h)
 
-                    d, h, p = sami_merger.join_and_process(d, h)
+        d, h, p = sami_merger.join_and_process(d, h)
 
-                    pyfits.writeto(output_obj_file, d, h)
+        pyfits.writeto(output_obj_file, d, h)
 
-                    obj_list_buffer.write('\n'.format(obj_file))
+    return df
 
-        log.info('All done.')
 
+def process_zero_files(df, red_path):
+    """
+    Args:
+        df (pandas.DataFrame) : a data-frame containing the all the data being
+        processed.
+        red_path (str) : the path where the reduced data is stored.
+
+    Returns:
+        updated_table (pandas.DataFrame) : an updated data-frame where each
+        file now is attached to the corresponding master Zero file.
+    """
+    sami_merger = merge.SamiMerger()
+
+    binning = df.binning.unique()
+
+    log.debug('Binning formats found in data: ')
+    for b in binning:
+        log.debug('   {:s}'.format(b))
+
+    for b in binning:
+
+        bx, by = b.split(' ')
+        log.info('Processing ZERO files with binning: {} x {}'.format(bx, by))
+
+        mask1 = df.obstype.values == 'ZERO'
+        mask2 = df.binning.values == b
+
+        zero_table = df.loc[mask1 & mask2]
+        zero_table = zero_table.sort_values('filename')
+
+        zero_list = []
+        for index, row in zero_table.iterrows():
+
+            sami_merger.zero_file = None
+            sami_merger.flat_file = None
+            zero_file = row.filename
+
+            path, fname = os.path.split(zero_file)
+            prefix = sami_merger.get_prefix()
+            output_zero_file = os.path.join(red_path, prefix + fname)
+
+            zero_list.append(prefix + fname)
+
+            if os.path.exists(output_zero_file):
+                log.warning('Skipping existing file: {}'.format(
+                    output_zero_file))
+                continue
+
+            log.info('Processing ZERO file: {}'.format(zero_file))
+
+            data = sami_merger.get_joined_data(zero_file)
+            header = pyfits.getheader(zero_file)
+
+            log.debug('Data format: {0[0]:d} x {0[1]:d}'.format(data.shape))
+
+            data, header, prefix = sami_merger.join_and_process(data, header)
+            pyfits.writeto(output_zero_file, data, header)
+
+        zero_list_name = os.path.join(red_path, "0Zero{}x{}".format(bx, by))
+
+        with open(zero_list_name, 'w') as zero_list_buffer:
+            for zero_file in zero_list:
+                zero_list_buffer.write('{:s}\n'.format(zero_file))
+
+        log.info('Combining ZERO files.')
+        master_zero = zero_list_name + '.fits'
+
+        if os.path.exists(master_zero):
+            log.warning(
+                'Skipping existing MASTER ZERO: {:s}'.format(master_zero))
+
+        else:
+
+            log.info("Writing master zero to: {}".format(master_zero))
+            zero_combine_files = [os.path.join(red_path, f) for f in zero_list]
+
+            zero_combine = combine.ZeroCombine(input_list=zero_combine_files,
+                                               output_file=master_zero)
+            zero_combine.run()
+            log.info('Done.')
+
+        mask1 = df['obstype'].values != 'ZERO'
+        mask2 = df['binning'].values == b
+        df.loc[mask1 & mask2, 'zero_file'] = master_zero
+
+    return df
+
+
+def reduce_sami(path, debug=False, quiet=False):
+
+    if debug:
+        log.setLevel('DEBUG')
+    elif quiet:
+        log.setLevel('NOTSET')
+    else:
+        log.setLevel('INFO')
+
+    log.info('SAMI Data-Reduction Pipeline')
+    log.info('Version {}'.format(version.__str__))
+
+    reduced_path = create_reduced_folder(os.path.join(path, 'RED'))
+
+    list_of_files = glob.glob(os.path.join(path, '*.fits'))
+    
+    table = build_table(list_of_files)
+
+    table = process_zero_files(table, reduced_path)
+
+    table = process_flat_files(table, reduced_path)
+
+    process_object_files(table, reduced_path)

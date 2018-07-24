@@ -13,12 +13,14 @@ v0.1.4 - Skipping existing ZERO and FLAT frames.
 v0.1.5 - sami_autoastrometry fixed (AGAIN!!).
        - Added try/except for missing RA/DEC.
        - Skipping existing object files.
+v0.2.0 - Refactored code using Pandas and DataFrames.
+       - Works with SOI!!
 """
 import calendar
 
 api = 0
-feature = 1
-bug = 5
+feature = 2
+bug = 0
 
 month = 7
 year = 2018

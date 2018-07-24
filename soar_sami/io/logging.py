@@ -20,29 +20,32 @@ COLORS = {
 }
 
 
-def get_logger(logger_name, use_color=True, overwrite=False):
+def get_logger(logger_name, use_color=True, overwrite=False,
+        message_format=" [%(levelname).1s %(asctime)s %(name)s] %(message)s"):
     """
     Return a logger with the "logger_name".
 
     Args:
         logger_name (str) : the logger name to be used in different contexts.
         use_colors (bool, optional) : use colors on Stream Loggers.
+        overwrite (bool, optional) : ?????
+        message_format (str, optional) : change the logger format.
 
     Returns:
         _logger (logging.Logger) : the logger to be used.
     """
-    message_format = " [%(levelname).1s %(asctime)s %(name)s] %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
     _logger = logging.getLogger(logger_name)
 
-    formatter = MyLogFormatter(message_format, datefmt=date_format, use_colours=use_color)
+    formatter = MyLogFormatter(message_format, datefmt=date_format,
+                               use_colours=use_color)
 
     if len(_logger.handlers) == 0:
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         _logger.addHandler(handler)
-        _logger.setLevel(logging.DEBUG)
+        _logger.setLevel(logging.INFO)
 
     return _logger
 

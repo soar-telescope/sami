@@ -60,19 +60,6 @@ _dilstruct[4, 0] = 0
 _dilstruct[4, 4] = 0
 
 
-def main():
-    pargs = _parse_arguments()
-
-    merge = SamiMerger(
-        zero_file=pargs.zero, clean=pargs.clean, cosmic_rays=pargs.rays,
-        dark_file=pargs.dark, debug=pargs.debug, flat_file=pargs.flat,
-        glow_file=pargs.glow, norm_flat=pargs.norm,
-        time=pargs.exptime, verbose=not pargs.quiet
-    )
-
-    merge.run(pargs.files)
-
-
 class SamiMerger:
     """
     SamiMerge
@@ -177,9 +164,6 @@ class SamiMerger:
         binning = _np.array([int(b) for b in h['CCDSUM'].split(' ')])
         plate_scale = h['PIXSCAL1'] * u.arcsec
         p = plate_scale.to('degree').value
-
-        _np.testing.assert_almost_equal(p, 1.2639e-5)
-
         w = wcs.WCS(naxis=2)
 
         try:
@@ -1008,52 +992,6 @@ def _normalize_data(data):
     mode = stats.mode(data.ravel()[sample])[0]
 
     return data / mode
-
-
-def _parse_arguments():
-    """
-    Parse the argument given by the user in the command line.
-
-    Returns
-    -------
-        pargs : Namespace
-        A namespace containing all the parameters that will be used for SAMI
-        XJoin.
-    """
-    import argparse
-
-    # Parsing Arguments ---
-    parser = argparse.ArgumentParser(
-        description="Join extensions existent in a single FITS file."
-    )
-
-    parser.add_argument('-b', '--zero', type=str, default=None,
-                        help="Consider BIAS file for subtraction.")
-    parser.add_argument('-c', '--clean', action='store_true',
-                        help="Clean known bad columns and lines by taking the "
-                             "median value of their neighbours.")
-    parser.add_argument('-d', '--dark', type=str, default=None,
-                        help="Consider DARK file for subtraction.")
-    parser.add_argument('-D', '--debug', action='store_true',
-                        help="Turn on DEBUG mode (overwrite quiet mode).")
-    parser.add_argument('-f', '--flat', type=str, default=None,
-                        help="Consider FLAT file for division.")
-    parser.add_argument('-n', '--norm', action='store_true',
-                        help="FLAT already normalized.")
-    parser.add_argument('-g', '--glow', type=str, default=None,
-                        help="Consider DARK file to correct lateral glows.")
-    parser.add_argument('-q', '--quiet', action='store_true',
-                        help="Run quietly.")
-    parser.add_argument('-r', '--rays', action='store_true',
-                        help='Use LACosmic.py to remove cosmic rays and hot '
-                             'pixels.')
-    parser.add_argument('-t', '--exptime', action='store_true',
-                        help="Divide by exposure time.")
-    parser.add_argument('files', metavar='files', type=str, nargs='+',
-                        help="input filenames.")
-
-    return parser.parse_args()
-
 
 if __name__ == '__main__':
     main()

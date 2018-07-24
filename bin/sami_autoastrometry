@@ -1793,7 +1793,7 @@ def main():
     saturation = -1
     overwrite = False
     outfile = ''
-    quiet = Falses
+    quiet = False
     userra = -999
     userdec = -999
     
