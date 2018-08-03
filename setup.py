@@ -18,7 +18,7 @@ here = path.abspath(path.dirname(__file__))
 #with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 #    long_description = f.read()
 
-from soar_sami.tools import version
+from soar_simager.tools import version
 
 setup(
     name='soar-sami',
@@ -104,11 +104,12 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     #entry_points={
     #    'console_scripts': [
-    #        'reduce_sami=bin:main',
+    #        'reduce=bin:main',
     #    ],
     #},
     scripts=[
         'bin/reduce_sami',
+        'bin/reduce_soi',
         'bin/sami_autoastrometry',
 ],
 

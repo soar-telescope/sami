@@ -2,8 +2,8 @@
 # -*- coding: utf8 -*-
 import sys
 
-from soar_sami.data_reduction import reduce
-from soar_sami.tools import version
+from soar_simager.data_reduction import soi
+from soar_simager.tools import version
 
 __author__ = 'Bruno Quint'
 __version__ = version
@@ -11,7 +11,7 @@ __version__ = version
 
 def main():
     args = _parse_arguments()
-    reduce.reduce_sami(args.path, debug=args.debug)
+    soi.reduce(args.path, debug=args.debug)
 
 
 def _parse_arguments():

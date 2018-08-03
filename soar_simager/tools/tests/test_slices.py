@@ -5,7 +5,7 @@ from __future__ import division, print_function
 import numpy
 import unittest
 
-from soar_sami.tools import slices
+from soar_simager.tools import slices
 
 __author__ = 'Bruno Quint'
 

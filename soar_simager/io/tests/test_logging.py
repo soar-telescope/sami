@@ -3,7 +3,7 @@ import logging
 import io
 import unittest
 
-from soar_sami.io.logging import get_logger, MyLogFormatter
+from soar_simager.io.logging import get_logger, MyLogFormatter
 
 
 class TestLogFormat(unittest.TestCase):

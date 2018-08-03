@@ -40,8 +40,9 @@ from scipy import stats
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import units as u
-from soar_sami.io.logging import get_logger
-from soar_sami.tools import slices, version
+from scipy.interpolate import Rbf
+from soar_simager.io.logging import get_logger
+from soar_simager.tools import slices, version
 
 logger = get_logger(__name__)
 
@@ -69,9 +70,6 @@ class SamiMerger:
 
     Parameters
     ----------
-        list_of_files : list
-            A list of input files
-
         zero_file : str
             The filename of the master zero that will be used in subtraction.
 
@@ -425,8 +423,8 @@ class SamiMerger:
                    clean.__class__)
 
         if clean is True:
-            data = self.clean_columns(data)
-            data = self.clean_lines(data)
+            data = self.clean_columns(data, header)
+            data = self.clean_lines(data, header)
             header.add_history('Cleaned bad columns and lines.')
             prefix = 'c' + prefix
 
@@ -509,7 +507,7 @@ class SamiMerger:
 
         if flat_file is not None:
             flat = _pyfits.getdata(flat_file)
-            data /= flat
+            data = _np.where(flat > 0.1, data / flat, 0)
             header['FLATFILE'] = flat_file
             header.add_history('Flat normalized')
             prefix = 'f' + prefix
@@ -679,7 +677,7 @@ class SamiMerger:
 
         return prefix
 
-    def join_and_process(self, data, header):
+    def process(self, data, header):
 
         # If the number of extensions is just 1, then the file is already
         # processed.
@@ -945,19 +943,19 @@ class SamiMerger:
         """
         Subtract zero from data.
 
-            Parameters
-            ----------
-                data : numpy.ndarray
-                    A 2D numpy array that contains the data.
+        Parameters
+        ----------
+            data : numpy.ndarray
+                A 2D numpy array that contains the data.
 
-                header : astropy.io.fits.Header
-                    A header that will be updated.
+            header : astropy.io.fits.Header
+                A header that will be updated.
 
-                prefix : str
-                    File prefix that is added after each process.
+            prefix : str
+                File prefix that is added after each process.
 
-                zero_file: str | None
-                    Master Bias filename. If None is given, nothing is done.
+            zero_file: str | None
+                Master Bias filename. If None is given, nothing is done.
         """
         from os.path import abspath
 
@@ -993,5 +991,232 @@ def _normalize_data(data):
 
     return data / mode
 
-if __name__ == '__main__':
-    main()
+
+class SoiMerger(SamiMerger):
+    """
+    SamiMerge
+
+    This class holds all the methods used to join the extensions within a
+    FITS file obtained with SAMI.
+
+    Parameters
+    ----------
+        zero_file : str
+            The filename of the master zero that will be used in subtraction.
+
+        clean : bool
+            Clean bad collumns by taking the median value of the pixels around
+            them.
+
+        cosmic_rays : bool
+            Clean cosmic rays using LACosmic package. See noted bellow for
+            reference.
+
+        dark_file : str
+            Master Dark's filename to be used for dark subtraction.
+
+        debug : bool
+            Turn on debug mode with lots of printing.
+
+        flat_file : str
+            Master Flat filename to be used for normalization.
+
+        glow_file : str
+            Master file that contains the lateral glowings sometimes present in
+            SAMI's data.
+
+        time : bool
+            Divide each pixel's values by the exposure time and update header.
+
+        verbose : bool
+            Turn on verbose mode (not so talktive as debug mode).
+
+    See also
+    --------
+        LACosmic - http://www.astro.yale.edu/dokkum/lacosmic/
+    """
+
+    @staticmethod
+    def add_gap(data, header, interpolation_factor=10):
+        """
+        SOI has two detectors which are separated by 7.8 arcsec (or 102
+        unbinned pixels). This method reads an merged array and adds the gap
+        based on the detector's binning.
+
+        Parameters
+        ----------
+            data : numpy.ndarray
+                2D array with the data merged.
+
+            header : astropy.io.fits.Header
+                a header that contains the binning information on the 'CCDSUM'
+                key.
+        """
+        binning = header['CCDSUM']
+        binning = int(binning.split()[0])
+
+        gap_size = 7.8  # arcseconds
+        pixel_scale = 0.0767  # arcsecond / pixel
+        gap_pixel = int(round(gap_size / pixel_scale / binning, 0))
+
+        nrow, ncol = data.shape
+
+        data = _np.append(data, _np.zeros((nrow, gap_pixel)), axis=1)
+        data[:, ncol // 2 + gap_pixel:] = data[:, ncol // 2:- gap_pixel]
+        data[:, ncol // 2:ncol // 2 + gap_pixel] = 0
+
+        return data, header
+
+    def clean_columns(self, _data, _header):
+        """
+        Clean the known bad columns that exists in most of SAMI's data.
+
+        Parameters
+        ----------
+            _data : numpy.ndarray
+                A 2D numpy array that contains the data.
+
+            _header : astropy.io.fits.Header
+                a header that contains the binning information on the 'CCDSUM'
+                key.
+
+        See also
+        --------
+            SoiMerger.clean_column
+            SoiMerger.clean_line
+            SoiMerger.clean_lines
+        """
+        if not isinstance(_data, _np.ndarray):
+            raise (TypeError, 'Please, use a np.array as input')
+        if _data.ndim is not 2:
+            raise (TypeError, 'Data contains %d dimensions while it was '
+                              'expected 2 dimensions.')
+
+        b = int(_header['CCDSUM'].strip().split(' ')[0])
+
+        if b == 1:
+            bad_columns = []
+        elif b == 2:
+            bad_columns = [
+                [855, 0, 2047],
+            ]
+        elif b == 4:
+            bad_columns = [
+                [427, 0, 1023]
+            ]
+        else:
+            logger.warning(
+                'Skipping clean_columns for binning {} x {}'.format(b, b))
+            bad_columns = []
+
+        for column in bad_columns:
+            x0 = column[0]
+            y0 = column[1]
+            yf = column[2]
+            _data = self.clean_column(_data, x0, y0, yf)
+
+        return _data
+
+    def clean_lines(self, _data, _header):
+        """
+        Clean the known bad lines that exists in most of SAMI's data.
+
+        Parameters
+        ----------
+            _data : numpy.ndarray
+                A 2D numpy array that contains the data.
+
+            _header : astropy.io.fits.Header
+                a header that contains the binning information on the 'CCDSUM'
+                key.
+
+        See also
+        --------
+            SoiMerger.clean_column
+            SoiMerger.clean_columns
+            SoiMerger.clean_line
+        """
+        if not isinstance(_data, _np.ndarray):
+            raise (TypeError, 'Please, use a np.array as input')
+        if _data.ndim is not 2:
+            raise (TypeError, 'Data contains %d dimensions while it was '
+                              'expected 2 dimensions.')
+
+        b = int(_header['CCDSUM'].strip().split(' ')[0])
+
+        if b == 1:
+            bad_lines = []
+        elif b == 2:
+            bad_lines = []
+        elif b == 4:
+            bad_lines = []
+        else:
+            logger.warning(
+                'Skipping clean_columns for binning {} x {}'.format(b, b))
+            bad_lines = []
+
+        for line in bad_lines:
+            x0 = line[0]
+            xf = line[1]
+            y = line[2]
+            _data = self.clean_line(_data, x0, xf, y)
+
+        return _data
+
+    def process(self, data, header):
+
+        # If the number of extensions is just 1, then the file is already
+        # processed.
+        if header['NEXTEND'] == 1:
+            return data, header, ''
+
+        prefix = "m_"
+
+        # Removing bad column and line
+        data = self.remove_central_bad_columns(data)
+
+        # Add gap between detectors
+        data, header = self.add_gap(data, header)
+
+        # BIAS subtraction
+        data, header, prefix = self.zero_subtraction(
+            data, header, prefix, self.zero_file
+        )
+
+        # DARK subtraction
+        data, header, prefix = self.dark_subtraction(
+            data, header, prefix, self.dark_file
+        )
+
+        # Remove cosmic rays and hot pixels
+        data, header, prefix = self.remove_cosmic_rays(
+            data, header, prefix, self.cosmic_rays
+        )
+
+        # Remove lateral glows
+        data, header, prefix = self.remove_glows(
+            data, header, prefix, self.glow_file
+        )
+
+        # FLAT division
+        data, header, prefix = self.divide_by_flat(
+            data, header, prefix, self.flat_file
+        )
+
+        # Normalize by the EXPOSURE TIME
+        data, header, prefix = self.divide_by_exposuretime(
+            data, header, prefix, self.time
+        )
+
+        # Clean known bad columns and lines
+        data, header, prefix = self.clean_hot_columns_and_lines(
+            data, header, prefix, self.clean
+        )
+
+        # Writing file
+        try:
+            header['NEXTEND'] = 1
+        except KeyError:
+            pass
+
+        return data, header, prefix

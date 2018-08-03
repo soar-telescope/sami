@@ -7,10 +7,10 @@ import glob
 import numpy
 import os
 
-from soar_sami.io import pyfits
-from soar_sami.io.logging import get_logger
-from soar_sami.tools import version
-from soar_sami.data_reduction import merge, combine
+from soar_simager.io import pyfits
+from soar_simager.io.logging import get_logger
+from soar_simager.tools import version
+from soar_simager.data_reduction import merge, combine
 
 astropy_logger = get_logger('astropy')
 astropy_logger.setLevel('NOTSET')
@@ -18,7 +18,7 @@ astropy_logger.setLevel('NOTSET')
 ccdproc_logger = get_logger('ccdproc')
 ccdproc_logger.setLevel('NOTSET')
 
-log = get_logger('samidr')
+log = get_logger('soidr')
 log.propagate = False
 
 __author__ = 'Bruno Quint'
@@ -42,6 +42,7 @@ def build_table(list_of_files):
     table = pd.DataFrame(
         columns=[
             'filename',
+            'instrume',
             'obstype',
             'filters',
             'filter1',
@@ -68,6 +69,7 @@ def build_table(list_of_files):
         row = pd.Series(data={
             'filename': _file,
             'obstype': hdu[0].header['obstype'],
+            'instrume': hdu[0].header['instrume'].strip().upper(),
             'filters': hdu[0].header['filters'],
             'filter1': hdu[0].header['filter1'],
             'filter2': hdu[0].header['filter2'],
@@ -134,7 +136,8 @@ def process_flat_files(df, red_path):
         file now is attached to the corresponding master Zero file.
     """
     log.info('Processing FLAT files (SFLAT + DFLAT)')
-    sami_merger = merge.SamiMerger()
+    soi_merger = merge.SoiMerger()
+    soi_merger.clean = True
 
     binning = df.binning.unique()
 
@@ -165,10 +168,10 @@ def process_flat_files(df, red_path):
             flat_list = []
             for index, row in filter_flat_df.iterrows():
 
-                sami_merger.zero_file = row.zero_file
-                sami_merger.flat_file = None
+                soi_merger.zero_file = row.zero_file
+                soi_merger.flat_file = None
                 flat_file = row.filename
-                prefix = sami_merger.get_prefix()
+                prefix = soi_merger.get_prefix()
 
                 path, fname = os.path.split(flat_file)
                 output_flat = os.path.join(red_path, prefix + fname)
@@ -181,10 +184,10 @@ def process_flat_files(df, red_path):
 
                 log.info('Processing FLAT file: {}'.format(flat_file))
 
-                d = sami_merger.get_joined_data(flat_file)
-                h = pyfits.getheader(flat_file)
+                d = soi_merger.get_joined_data(flat_file)
+                h = soi_merger.get_header(flat_file)
 
-                d, h, p = sami_merger.join_and_process(d, h)
+                d, h, p = soi_merger.process(d, h)
                 pyfits.writeto(output_flat, d, h)
 
             flat_list_name = os.path.join(
@@ -227,8 +230,9 @@ def process_object_files(df, red_path):
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    sami_merger = merge.SamiMerger()
-    sami_merger.cosmic_rays = True
+    soi_merger = merge.SoiMerger()
+    soi_merger.cosmic_rays = True
+    soi_merger.clean = True
 
     log.info('Processing OBJECT files.')
 
@@ -236,12 +240,12 @@ def process_object_files(df, red_path):
 
     for index, row in object_df.iterrows():
 
-        sami_merger.zero_file = row.zero_file
-        sami_merger.flat_file = row.flat_file
+        soi_merger.zero_file = row.zero_file
+        soi_merger.flat_file = row.flat_file
         obj_file = row.filename
 
         path, fname = os.path.split(obj_file)
-        prefix = sami_merger.get_prefix()
+        prefix = soi_merger.get_prefix()
         output_obj_file = os.path.join(path, 'RED', prefix + fname)
 
         if os.path.exists(output_obj_file):
@@ -251,11 +255,11 @@ def process_object_files(df, red_path):
 
         log.info('Processing OBJECT file: {}'.format(obj_file))
 
-        d = sami_merger.get_joined_data(obj_file)
-        h = sami_merger.get_header(obj_file)
-        h = sami_merger.add_wcs(d, h)
+        d = soi_merger.get_joined_data(obj_file)
+        h = soi_merger.get_header(obj_file)
+        h = soi_merger.add_wcs(d, h)
 
-        d, h, p = sami_merger.join_and_process(d, h)
+        d, h, p = soi_merger.process(d, h)
 
         pyfits.writeto(output_obj_file, d, h)
 
@@ -273,7 +277,7 @@ def process_zero_files(df, red_path):
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    sami_merger = merge.SamiMerger()
+    soi_merger = merge.SoiMerger()
 
     binning = df.binning.unique()
 
@@ -295,12 +299,13 @@ def process_zero_files(df, red_path):
         zero_list = []
         for index, row in zero_table.iterrows():
 
-            sami_merger.zero_file = None
-            sami_merger.flat_file = None
+            soi_merger.zero_file = None
+            soi_merger.flat_file = None
+            soi_merger.clean = True
             zero_file = row.filename
 
             path, fname = os.path.split(zero_file)
-            prefix = sami_merger.get_prefix()
+            prefix = soi_merger.get_prefix()
             output_zero_file = os.path.join(red_path, prefix + fname)
 
             zero_list.append(prefix + fname)
@@ -312,12 +317,12 @@ def process_zero_files(df, red_path):
 
             log.info('Processing ZERO file: {}'.format(zero_file))
 
-            data = sami_merger.get_joined_data(zero_file)
-            header = pyfits.getheader(zero_file)
+            data = soi_merger.get_joined_data(zero_file)
+            header = soi_merger.get_header(zero_file)
 
             log.debug('Data format: {0[0]:d} x {0[1]:d}'.format(data.shape))
 
-            data, header, prefix = sami_merger.join_and_process(data, header)
+            data, header, prefix = soi_merger.process(data, header)
             pyfits.writeto(output_zero_file, data, header)
 
         zero_list_name = os.path.join(red_path, "0Zero{}x{}".format(bx, by))
@@ -350,7 +355,7 @@ def process_zero_files(df, red_path):
     return df
 
 
-def reduce_sami(path, debug=False, quiet=False):
+def reduce(path, debug=False, quiet=False):
 
     if debug:
         log.setLevel('DEBUG')
@@ -359,17 +364,42 @@ def reduce_sami(path, debug=False, quiet=False):
     else:
         log.setLevel('INFO')
 
-    log.info('SAMI Data-Reduction Pipeline')
+    log.info('SOAR Imager Data-Reduction Pipeline')
     log.info('Version {}'.format(version.__str__))
 
     reduced_path = create_reduced_folder(os.path.join(path, 'RED'))
 
     list_of_files = glob.glob(os.path.join(path, '*.fits'))
-    
+
     table = build_table(list_of_files)
+
+    table = filter_files(table)
 
     table = process_zero_files(table, reduced_path)
 
     table = process_flat_files(table, reduced_path)
 
     process_object_files(table, reduced_path)
+
+
+def filter_files(df):
+    """
+    Remove files that are not obtained with SOI from the data-frame.
+
+    Args:
+        df (pandas.DataFrame)
+
+    Returns:
+        filtered_df (pandas.DataFrame)
+    """
+    log.info('Checking how many files obtained with SOI')
+
+    n_total = len(df.index)
+    df = df[df.instrume == 'SOI']
+    n_processed = len(df.index)
+    n_rejected = n_total - n_processed
+
+    log.info('Number of files to be processed: {:d}'.format(n_processed))
+    log.info('Number of files rejected: {:d}'.format(n_rejected))
+
+    return df
