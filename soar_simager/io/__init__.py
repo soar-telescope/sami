@@ -1,4 +1,2 @@
 
-import astropy.io.fits as pyfits
-
-from . import logging
+from astropy.io import fits as pyfits

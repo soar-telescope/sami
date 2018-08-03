@@ -61,9 +61,9 @@ _dilstruct[4, 0] = 0
 _dilstruct[4, 4] = 0
 
 
-class SamiMerger:
+class Merger:
     """
-    SamiMerge
+    Merger
 
     This class holds all the methods used to join the extensions within a
     FITS file obtained with SAMI.
@@ -105,10 +105,9 @@ class SamiMerger:
         LACosmic - http://www.astro.yale.edu/dokkum/lacosmic/
     """
 
-    def __init__(self, zero_file=None, clean=False,
-                 cosmic_rays=False, dark_file=None, debug=False,
-                 flat_file=None, glow_file=None, norm_flat=False,
-                 time=False, verbose=False):
+    def __init__(self, clean=False, cosmic_rays=False, dark_file=None,
+                 debug=False, flat_file=None, glow_file=None, norm_flat=False,
+                 time=False, verbose=False, zero_file=None):
 
         logger.setLevel("ERROR")
 
@@ -175,7 +174,6 @@ class SamiMerger:
 
             coordinates = SkyCoord(ra=h['TELRA'], dec=h['TELDEC'],
                                    unit=(u.hourangle, u.deg))
-
 
         ra = coordinates.ra.to('degree').value
         dec = coordinates.dec.to('degree').value
@@ -796,7 +794,6 @@ class SamiMerger:
                 Path to a long dark file that contains the lateral glow.
         """
         if glow_file is not None:
-
             # Create four different regions.
             regions = [
                 [_np.median(data[539:589, 6:56]),  # Top Left
@@ -969,35 +966,16 @@ class SamiMerger:
         return data, header, prefix
 
 
-def _normalize_data(data):
+class SamiMerger(Merger):
+    pass
+
+
+class SoiMerger(Merger):
     """
-    This method is intended to normalize flat data before it is applied to the
-    images that are being reduced. A total of 1000 random points are used to
-    estimate the median level that will be used for normalization.
-
-    Parameter
-    ---------
-    data : numpy.ndarray
-        Data that will be normalized
-
-    Returns
-    -------
-    norm_data : numpy.ndarray
-        Normalized data.
-
-    """
-    sample = random.randint(0, high=data.size - 1, size=1000)
-    mode = stats.mode(data.ravel()[sample])[0]
-
-    return data / mode
-
-
-class SoiMerger(SamiMerger):
-    """
-    SamiMerge
+    SoiMerger
 
     This class holds all the methods used to join the extensions within a
-    FITS file obtained with SAMI.
+    FITS file obtained with SOI.
 
     Parameters
     ----------
@@ -1220,3 +1198,22 @@ class SoiMerger(SamiMerger):
             pass
 
         return data, header, prefix
+
+
+def _normalize_data(data):
+    """
+    This method is intended to normalize flat data before it is applied to the
+    images that are being reduced. A total of 1000 random points are used to
+    estimate the median level that will be used for normalization.
+
+    Args:
+
+        data (numpy.ndarray) : Data that will be normalized
+
+    Returns:
+        norm_data (numpy.ndarray) : Normalized data.
+    """
+    sample = random.randint(0, high=data.size - 1, size=1000)
+    mode = stats.mode(data.ravel()[sample])[0]
+
+    return data / mode

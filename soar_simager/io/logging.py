@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
 
-import logging
+# ToDo - Implement logging to file
+
+import logging as _logging
 
 __all__ = ['COLORS', 'get_logger', 'MyLogFormatter']
 
@@ -19,43 +21,46 @@ COLORS = {
     'ERROR': RED
 }
 
+LOG_FORMAT = " [%(levelname).1s %(asctime)s %(name)s] %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-def get_logger(logger_name, use_color=True, overwrite=False,
-        message_format=" [%(levelname).1s %(asctime)s %(name)s] %(message)s"):
+
+def get_logger(logger_name, use_color=True, message_format=LOG_FORMAT):
     """
     Return a logger with the "logger_name".
 
     Args:
         logger_name (str) : the logger name to be used in different contexts.
-        use_colors (bool, optional) : use colors on Stream Loggers.
-        overwrite (bool, optional) : ?????
+
+        use_color (bool, optional) : use colors on Stream Loggers.
+
         message_format (str, optional) : change the logger format.
 
     Returns:
         _logger (logging.Logger) : the logger to be used.
     """
-    date_format = "%Y-%m-%d %H:%M:%S"
+    _logger = _logging.getLogger(logger_name)
 
-    _logger = logging.getLogger(logger_name)
+    date_format = DATE_FORMAT
 
-    formatter = MyLogFormatter(message_format, datefmt=date_format,
-                               use_colours=use_color)
+    formatter = MyLogFormatter(
+        message_format, datefmt=date_format, use_colours=use_color)
 
     if len(_logger.handlers) == 0:
-        handler = logging.StreamHandler()
+
+        handler = _logging.StreamHandler()
         handler.setFormatter(formatter)
+
         _logger.addHandler(handler)
-        _logger.setLevel(logging.INFO)
+        _logger.setLevel(_logging.INFO)
 
     return _logger
 
 
-class MyLogFormatter(logging.Formatter):
+class MyLogFormatter(_logging.Formatter):
 
-    def __init__(self, fmt=" [%(levelname).1s %(asctime)s %(name)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
-                 use_colours=True):
-
-        logging.Formatter.__init__(self, fmt, datefmt=datefmt)
+    def __init__(self, fmt=LOG_FORMAT, datefmt=DATE_FORMAT, use_colours=True):
+        _logging.Formatter.__init__(self, fmt, datefmt=datefmt)
         self.use_colours = use_colours
 
     @staticmethod
@@ -71,7 +76,7 @@ class MyLogFormatter(logging.Formatter):
     def format(self, record):
 
         # Call the original formatter class to do the grunt work
-        result = logging.Formatter.format(self, record)
+        result = _logging.Formatter.format(self, record)
 
         if self.use_colours:
             result = self.color_format(result, record.levelname)
@@ -82,7 +87,7 @@ class MyLogFormatter(logging.Formatter):
 if __name__ == "__main__":
 
     logger = get_logger('TestColor')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(_logging.DEBUG)
 
     logger.debug("debug message")
     logger.info("info message")
