@@ -358,7 +358,7 @@ def sextract(sexfilename, nxpix, nypix, border=3, corner=12, minfwhm=1.5, maxfwh
         if (len(catlines[l]) <= 1 or catlines[l][0] == '#'):
             continue
         
-        iobj = SexObj(catlines[l]) #process the line into an object
+        iobj = SexObj(catlines[l]) #reduce the line into an object
         nsexinit += 1
         
         #Initial filtering
@@ -598,7 +598,7 @@ def getcatalog(catalog, ra, dec, boxsize, minmag=8.0, maxmag=-1, maxpm=60.):
         if mag < minmag: continue #ignore anything this bright
         if abs(pmra) > maxpm or abs(pmdec) > maxpm: continue
         #print ' OK',
-        iobj = Obj(ra, dec, mag) #process the line into an object
+        iobj = Obj(ra, dec, mag) #reduce the line into an object
         catlist.append(iobj)
         
     catlist.sort(magcomp)   
@@ -1424,7 +1424,7 @@ overwrite=False, outfile='', saturation=-1, quiet=False, norot=0):
         maxrad = 60*(15 / (math.pi * min(density,catdensity)) )**0.5 # numcomp ~ 15 [look at 15 closest objects
         maxrad = max(maxrad, 60.0)                                 #               in sparse dataset]
         if maxrad == 60.0:                           
-             minrad = 10.0   # in theory could scale this up further to reduce #comparisons
+             minrad = 10.0   # in theory could scale this up further to _main #comparisons
         maxrad = min(maxrad, fieldwidth*3./4)                
 
     #note that density is per arcmin^2, while the radii are in arcsec, hence the conversion factor.
