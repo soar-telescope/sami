@@ -4,7 +4,7 @@ import numpy as np
 
 from astropy.io import fits as pyfits
 
-from soar_simager.data_reduction.merge import SoiMerger
+from soar_simager.data_reduction.reduce import SoiReducer
 
 
 class TestSoiMerger(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestSoiMerger(unittest.TestCase):
         data = data[np.newaxis, :]
         data = np.repeat(data, naxis2, axis=0)
 
-        soi_merger = SoiMerger()
+        soi_merger = SoiReducer()
         output_data, output_header = soi_merger.add_gap(data, header)
 
         gap_pixel = int(round(gap_size / pixel_scale / binning))

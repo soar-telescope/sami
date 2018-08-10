@@ -10,7 +10,7 @@ import os
 from soar_simager.io import pyfits
 from soar_simager.io.logging import get_logger
 from soar_simager.tools import version
-from soar_simager.data_reduction import merge, combine
+from soar_simager.data_reduction import reduce, combine
 
 astropy_logger = get_logger('astropy')
 astropy_logger.setLevel('NOTSET')
@@ -136,7 +136,7 @@ def process_flat_files(df, red_path):
         file now is attached to the corresponding master Zero file.
     """
     log.info('Processing FLAT files (SFLAT + DFLAT)')
-    soi_merger = merge.SoiMerger()
+    soi_merger = reduce.SoiReducer()
     soi_merger.clean = True
 
     binning = df.binning.unique()
@@ -184,10 +184,10 @@ def process_flat_files(df, red_path):
 
                 log.info('Processing FLAT file: {}'.format(flat_file))
 
-                d = soi_merger.get_joined_data(flat_file)
+                d = soi_merger.merge(flat_file)
                 h = soi_merger.get_header(flat_file)
 
-                d, h, p = soi_merger.process(d, h)
+                d, h, p = soi_merger.reduce(d, h)
                 pyfits.writeto(output_flat, d, h)
 
             flat_list_name = os.path.join(
@@ -230,7 +230,7 @@ def process_object_files(df, red_path):
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    soi_merger = merge.SoiMerger()
+    soi_merger = reduce.SoiReducer()
     soi_merger.cosmic_rays = True
     soi_merger.clean = True
 
@@ -255,11 +255,11 @@ def process_object_files(df, red_path):
 
         log.info('Processing OBJECT file: {}'.format(obj_file))
 
-        d = soi_merger.get_joined_data(obj_file)
+        d = soi_merger.merge(obj_file)
         h = soi_merger.get_header(obj_file)
         h = soi_merger.add_wcs(d, h)
 
-        d, h, p = soi_merger.process(d, h)
+        d, h, p = soi_merger.reduce(d, h)
 
         pyfits.writeto(output_obj_file, d, h)
 
@@ -277,7 +277,7 @@ def process_zero_files(df, red_path):
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    soi_merger = merge.SoiMerger()
+    soi_merger = reduce.SoiReducer()
 
     binning = df.binning.unique()
 
@@ -317,12 +317,12 @@ def process_zero_files(df, red_path):
 
             log.info('Processing ZERO file: {}'.format(zero_file))
 
-            data = soi_merger.get_joined_data(zero_file)
+            data = soi_merger.merge(zero_file)
             header = soi_merger.get_header(zero_file)
 
             log.debug('Data format: {0[0]:d} x {0[1]:d}'.format(data.shape))
 
-            data, header, prefix = soi_merger.process(data, header)
+            data, header, prefix = soi_merger.reduce(data, header)
             pyfits.writeto(output_zero_file, data, header)
 
         zero_list_name = os.path.join(red_path, "0Zero{}x{}".format(bx, by))

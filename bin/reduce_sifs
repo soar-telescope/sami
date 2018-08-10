@@ -1,0 +1,48 @@
+#!/usr/bin/env python 
+# -*- coding: utf8 -*-
+import sys
+
+from soar_simager.data_reduction import sami
+from soar_simager.tools import version
+
+__author__ = 'Bruno Quint'
+__version__ = version
+
+
+def main():
+    args = _parse_arguments()
+    sami._main(args.path, debug=args.debug)
+
+
+def _parse_arguments():
+    """
+    Parse the argument given by the user in the command line.
+
+    Returns
+    -------
+        pargs : Namespace
+        A namespace containing all the parameters that will be used for SAMI
+        XJoin.
+    """
+    import argparse
+
+    v = "{0.api:d}.{0.feature:d}.{0.bug:d}".format(version)
+
+    parser = argparse.ArgumentParser(
+        description="SAMI Data-Reduction Pipeline"
+    )
+
+    parser.add_argument('path', type=str,
+                        help="Path containing the data to be reduced.")
+
+    parser.add_argument('-D', '--debug', action='store_true',
+                        help="Turn on DEBUG mode (overwrite quiet mode).")
+
+    parser.add_argument('--version', action='version', version="%(prog)s " + v,
+                        help="Print the pipeline version and leaves.")
+
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    main()

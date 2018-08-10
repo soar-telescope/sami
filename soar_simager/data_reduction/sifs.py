@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
 
+import ccdproc
 import pandas as pd
 import glob
 import numpy
@@ -25,44 +26,6 @@ __author__ = 'Bruno Quint'
 KEYWORDS = ["OBSTYPE", "FILTERS", "CCDSUM"]
 
 
-def data_reduction(path, debug=False, quiet=False):
-
-    """
-    Main method for SAMI data reduction pipeline.
-
-    Args:
-         path (str) : path to the directory which contains the data.
-
-         debug (bool, optional) : enable debug mode (default = False).
-
-         quiet (bool, optional) : disable printing on screen (default = False).
-    """
-
-    if debug:
-        log.setLevel('DEBUG')
-    elif quiet:
-        log.setLevel('NOTSET')
-    else:
-        log.setLevel('INFO')
-
-    log.info('SAMI Data-Reduction Pipeline')
-    log.info('Version {}'.format(version.__str__))
-
-    reduced_path = create_reduced_folder(os.path.join(path, 'RED'))
-
-    list_of_files = glob.glob(os.path.join(path, '*.fits'))
-
-    dataframe = build_table(list_of_files)
-
-    dataframe = filter_files(dataframe)
-
-    dataframe = process_zero_files(dataframe, reduced_path)
-
-    dataframe = process_flat_files(dataframe, reduced_path)
-
-    process_object_files(dataframe, reduced_path)
-
-    
 def build_table(list_of_files):
     """
     Return a pandas.DataFrame used to organize the pipeline.
@@ -119,7 +82,7 @@ def build_table(list_of_files):
 
     return table
 
- 
+
 def create_reduced_folder(path):
     """
     Check if directory that will host the processed data exists or not. If not,
@@ -138,30 +101,7 @@ def create_reduced_folder(path):
 
     return path
 
- 
-def filter_files(df):
-    """
-    Remove files that are not obtained with SAMI from the data-frame.
 
-    Args:
-        df (pandas.DataFrame)
-
-    Returns:
-        filtered_df (pandas.DataFrame)
-    """
-    log.info('Checking how many files obtained with SAMI')
-
-    n_total = len(df.index)
-    df = df[df.instrume == 'SAM']
-    n_processed = len(df.index)
-    n_rejected = n_total - n_processed
-
-    log.info('Number of files to be processed: {:d}'.format(n_processed))
-    log.info('Number of files rejected: {:d}'.format(n_rejected))
-
-    return df
-
- 
 def get_binning_used(table):
     """
     Get all the binning modes used during the observation night.
@@ -183,7 +123,7 @@ def get_binning_used(table):
 
     return list_of_binning
 
- 
+
 def process_flat_files(df, red_path):
     """
     Args:
@@ -196,7 +136,7 @@ def process_flat_files(df, red_path):
         file now is attached to the corresponding master Zero file.
     """
     log.info('Processing FLAT files (SFLAT + DFLAT)')
-    sami_pipeline = reduce.SamiReducer()
+    sami_merger = reduce.SamiReducer()
 
     binning = df.binning.unique()
 
@@ -227,10 +167,10 @@ def process_flat_files(df, red_path):
             flat_list = []
             for index, row in filter_flat_df.iterrows():
 
-                sami_pipeline.zero_file = row.zero_file
-                sami_pipeline.flat_file = None
+                sami_merger.zero_file = row.zero_file
+                sami_merger.flat_file = None
                 flat_file = row.filename
-                prefix = sami_pipeline.get_prefix()
+                prefix = sami_merger.get_prefix()
 
                 path, fname = os.path.split(flat_file)
                 output_flat = os.path.join(red_path, prefix + fname)
@@ -243,9 +183,11 @@ def process_flat_files(df, red_path):
 
                 log.info('Processing FLAT file: {}'.format(flat_file))
 
-                hdul = pyfits.open(flat_file)
-                data, header, prefix = sami_pipeline.reduce(hdul)
-                pyfits.writeto(output_flat, data, header)
+                d = sami_merger.merge(flat_file)
+                h = pyfits.getheader(flat_file)
+
+                d, h, p = sami_merger.reduce(d, h)
+                pyfits.writeto(output_flat, d, h)
 
             flat_list_name = os.path.join(
                 red_path, "1FLAT_{}x{}_{}".format(bx, by, _filter))
@@ -275,23 +217,20 @@ def process_flat_files(df, red_path):
 
     return df
 
- 
+
 def process_object_files(df, red_path):
     """
     Args:
-
         df (pandas.DataFrame) : a data-frame containing the all the data being
         processed.
-
         red_path (str) : the path where the reduced data is stored.
 
     Returns:
-
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    sami_pipeline = reduce.SamiReducer()
-    sami_pipeline.cosmic_rays = True
+    sami_merger = reduce.SamiReducer()
+    sami_merger.cosmic_rays = True
 
     log.info('Processing OBJECT files.')
 
@@ -299,13 +238,13 @@ def process_object_files(df, red_path):
 
     for index, row in object_df.iterrows():
 
-        sami_pipeline.zero_file = row.zero_file
-        sami_pipeline.flat_file = row.flat_file
+        sami_merger.zero_file = row.zero_file
+        sami_merger.flat_file = row.flat_file
         obj_file = row.filename
 
         path, fname = os.path.split(obj_file)
-        prefix = sami_pipeline.get_prefix()
-        output_obj_file = os.path.join(red_path, prefix + fname)
+        prefix = sami_merger.get_prefix()
+        output_obj_file = os.path.join(path, 'RED', prefix + fname)
 
         if os.path.exists(output_obj_file):
             log.warning(
@@ -314,13 +253,17 @@ def process_object_files(df, red_path):
 
         log.info('Processing OBJECT file: {}'.format(obj_file))
 
-        hdul = pyfits.open(obj_file)
-        data, header, prefix = sami_pipeline.reduce(hdul)
-        pyfits.writeto(output_obj_file, data, header)
+        d = sami_merger.merge(obj_file)
+        h = sami_merger.get_header(obj_file)
+        h = sami_merger.add_wcs(d, h)
+
+        d, h, p = sami_merger.reduce(d, h)
+
+        pyfits.writeto(output_obj_file, d, h)
 
     return df
 
- 
+
 def process_zero_files(df, red_path):
     """
     Args:
@@ -332,8 +275,7 @@ def process_zero_files(df, red_path):
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    sami_pipeline = reduce.SamiReducer()
-    sami_pipeline.cosmic_rays = True
+    sami_merger = reduce.SamiReducer()
 
     binning = df.binning.unique()
 
@@ -355,12 +297,12 @@ def process_zero_files(df, red_path):
         zero_list = []
         for index, row in zero_table.iterrows():
 
-            sami_pipeline.zero_file = None
-            sami_pipeline.flat_file = None
+            sami_merger.zero_file = None
+            sami_merger.flat_file = None
             zero_file = row.filename
 
             path, fname = os.path.split(zero_file)
-            prefix = sami_pipeline.get_prefix()
+            prefix = sami_merger.get_prefix()
             output_zero_file = os.path.join(red_path, prefix + fname)
 
             zero_list.append(prefix + fname)
@@ -372,8 +314,12 @@ def process_zero_files(df, red_path):
 
             log.info('Processing ZERO file: {}'.format(zero_file))
 
-            hdul = pyfits.open(zero_file)
-            data, header, prefix = sami_pipeline.reduce(hdul)
+            data = sami_merger.merge(zero_file)
+            header = pyfits.getheader(zero_file)
+
+            log.debug('Data format: {0[0]:d} x {0[1]:d}'.format(data.shape))
+
+            data, header, prefix = sami_merger.reduce(data, header)
             pyfits.writeto(output_zero_file, data, header)
 
         zero_list_name = os.path.join(red_path, "0Zero{}x{}".format(bx, by))
@@ -402,5 +348,65 @@ def process_zero_files(df, red_path):
         mask1 = df['obstype'].values != 'ZERO'
         mask2 = df['binning'].values == b
         df.loc[mask1 & mask2, 'zero_file'] = master_zero
+
+    return df
+
+
+def reduce(path, debug=False, quiet=False):
+    """
+    Main method for SAMI data reduction pipeline.
+
+    Args:
+         path (str) : path to the directory which contains the data.
+
+         debug (bool, optional) : enable debug mode (default = False).
+
+         quiet (bool, optional) : disable printing on screen (default = False).
+    """
+
+    if debug:
+        log.setLevel('DEBUG')
+    elif quiet:
+        log.setLevel('NOTSET')
+    else:
+        log.setLevel('INFO')
+
+    log.info('SAMI Data-Reduction Pipeline')
+    log.info('Version {}'.format(version.__str__))
+
+    reduced_path = create_reduced_folder(os.path.join(path, 'RED'))
+
+    list_of_files = glob.glob(os.path.join(path, '*.fits'))
+
+    dataframe = build_table(list_of_files)
+
+    dataframe = filter_files(dataframe)
+
+    dataframe = process_zero_files(dataframe, reduced_path)
+
+    dataframe = process_flat_files(dataframe, reduced_path)
+
+    process_object_files(dataframe, reduced_path)
+
+
+def filter_files(df):
+    """
+    Remove files that are not obtained with SAMI from the data-frame.
+
+    Args:
+        df (pandas.DataFrame)
+
+    Returns:
+        filtered_df (pandas.DataFrame)
+    """
+    log.info('Checking how many files obtained with SAMI')
+
+    n_total = len(df.index)
+    df = df[df.instrume == 'SAM']
+    n_processed = len(df.index)
+    n_rejected = n_total - n_processed
+
+    log.info('Number of files to be processed: {:d}'.format(n_processed))
+    log.info('Number of files rejected: {:d}'.format(n_rejected))
 
     return df

@@ -7,9 +7,30 @@ import ccdproc
 import numpy as np
 
 from astropy.io import fits as pyfits
-from astropy import units as u
 
 from soar_simager.io.logging import get_logger
+
+
+def scale_flat_sami(data):
+    """
+    Args:
+        data (numpy.ndarray) : data used to evaluate the scaling function.
+
+    Returns:
+        scale_factor (float) : the inverse of the median of central reagion of
+        the masked data.
+
+    """
+    data = np.ma.masked_invalid(data)
+    h, w = data.shape
+
+    r1, r2 = h // 2 - h // 10, h // 2 + h // 10
+    c1, c2 = w // 2 - w // 10, w // 2 + w // 10
+
+    data = data[r1:r2, c1:c2]
+    scale_factor = 1. / np.ma.median(data)
+
+    return scale_factor
 
 
 class Combine:
@@ -61,34 +82,39 @@ class Combine:
 class ZeroCombine(Combine):
 
     def __init__(self, input_list, output_file=None, verbose=False, debug=False):
+        """
+        Class created to help combining zero files.
+
+        Args:
+
+            input_list (list) : A list containing the input files.
+
+            output_file (str) : The output filename (optional).
+
+            verbose (bool) : Turn on verbose mode? (default = False)
+
+            debug (bool) : Turn on debug mode? (default = False)
+
+        """
         Combine.__init__(self, verbose=verbose, debug=debug)
         self.input_list = input_list
         self.output_filename = output_file
 
     def run(self):
 
-        list_of_data = []
-        for f in self.input_list:
-            hdr = pyfits.getheader(f)
-
-            data = pyfits.getdata(f)
-            mask = np.isnan(data)
-
-            ccd_data = ccdproc.CCDData(data, unit=u.adu, mask=mask)
-            list_of_data.append(ccd_data)
+        header = pyfits.getheader(self.input_list[0])
+        bx, by = header['CCDSUM'].strip().split()
 
         # Parameter obtained from PySOAR, written by Luciano Fraga
         master_bias = ccdproc.combine(
-            list_of_data, method='average', mem_limit=6.4e7, minmax_clip=True
-        )
-
-        master_bias.header = hdr
+            self.input_list, method='average', mem_limit=6.4e7,
+            minmax_clip=True, unit='adu')
 
         if self.output_filename is None:
-            master_bias.write('0ZERO.fits')
+            self.output_filename = "0Zero{}x{}".format(bx, by)
 
-        else:
-            master_bias.write(self.output_filename)
+        pyfits.writeto(
+            self.output_filename, master_bias.data, header)
 
 
 class FlatCombine(Combine):
@@ -101,58 +127,46 @@ class FlatCombine(Combine):
         given as argument.
 
         Args:
+
             input_list (list) : A list containing the input files.
+
             output_file (str) : The output filename (optional).
+
             verbose (bool) : Turn on verbose mode? (default = False)
+
             debug (bool) : Turn on debug mode? (default = False)
+
         """
+
         Combine.__init__(self, verbose=verbose, debug=debug)
         self.input_list = input_list
         self.output_filename = output_file
 
     def run(self):
 
-        list_of_data = []
-        for f in self.input_list:
+        header = pyfits.getheader(self.input_list[0])
 
-            hdr = pyfits.getheader(f)
-            data = pyfits.getdata(f)
+        if header['INSTRUME'] == 'SAM':
+            scale_function = scale_flat_sami
 
-            h, w = data.shape
-            x, y = np.mgrid[0:h, 0:w]
-
-            x_center = data.shape[1] // 2
-            x_bsize = int(0.40 * data.shape[1])
-            x1, x2 = x_center - x_bsize, x_center + x_bsize
-            x = (x1 < x) * (x < x2)
-
-            y_center = data.shape[0] // 2
-            y_bsize = int(0.05 * data.shape[0])
-            y1, y2 = y_center - y_bsize, y_center + y_bsize
-            y = (y1 < y) * (y < y2)
-
-            norm_factor = np.median(data[(data * x * y) != 0])
-
-            data = data / norm_factor
-            data = ccdproc.CCDData(data, unit=u.adu)
-
-            list_of_data.append(data)
+        # TODO - Scale Function for SOI and SIFS
 
         # Parameter obtained from PySOAR, written by Luciano Fraga
-        master_flat = ccdproc.combine(
-            list_of_data, method='median', mem_limit=6.4e7, sigma_clip=True)
+        ccd_data = ccdproc.combine(
+            self.input_list, method='median', mem_limit=6.4e7, sigma_clip=True,
+            unit='adu', scale=scale_function
+        )
 
-        master_flat.header = hdr
+        data = ccd_data.data
+
         if self.output_filename is None:
 
-            filter_name = hdr['FILTERS'].strip()
-            binning = int(hdr['CCDSUM'].strip().split(' ')[0])
+            filter_name = header['FILTERS'].strip()
+            binning = int(header['CCDSUM'].strip().split(' ')[0])
             self.debug('Binning: {:d}'.format(binning))
 
-            filename = '1NSFLAT{0:d}x{0:d}_{1:s}.fits'.format(
-                binning, filter_name)
+            self.output_filename = \
+                '1NSFLAT{0:d}x{0:d}_{1:s}.fits'.format(
+                    binning, filter_name)
 
-            master_flat.write(filename, overwrite=True)
-
-        else:
-            master_flat.write(self.output_filename, overwrite=True)
+        pyfits.writeto(self.output_filename, data, header)
