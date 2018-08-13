@@ -4,6 +4,7 @@
 import unittest
 import numpy as _np
 
+from astropy import wcs
 from soar_simager.data_reduction import reduce
 from soar_simager.io import pyfits
 
@@ -64,6 +65,36 @@ class TestReducer(unittest.TestCase):
         self.assertIsInstance(data, _np.ndarray)
         self.assertIsInstance(header, pyfits.Header)
 
+
+class TestWCS(unittest.TestCase):
+
+    def setUp(self):
+
+        self.reducer = reduce.Reducer()
+
+    def test_create_wcs(self):
+
+        d = _np.ones((2000, 2000))
+        h = pyfits.Header()
+
+        h['PIXSCAL1'] = 0.045
+        h['PIXSCAL2'] = 0.045
+        h['CCDSUM'] = '2 2'
+        h['RA'] = "00:00:00"
+        h['DEC'] = "00:00:00"
+        h['DECPANGL'] = 0
+
+        h = self.reducer.create_wcs(d, h)
+
+        w = wcs.WCS(header=h)
+
+        pixcrd = _np.array([[0, 0], [24, 38], [45, 98]], _np.float_)
+
+        world = w.wcs_pix2world(pixcrd, 1)
+
+        pixcrd2 = w.wcs_world2pix(world, 1)
+
+        _np.testing.assert_almost_equal(pixcrd, pixcrd2)
 
 if __name__ == '__main__':
     unittest.main()

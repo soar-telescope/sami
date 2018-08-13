@@ -11,7 +11,7 @@ __version__ = version
 
 def main():
     args = _parse_arguments()
-    sami.reduce(args.path, debug=args.debug)
+    sami.data_reduction(args.path, debug=args.debug)
 
 
 def _parse_arguments():

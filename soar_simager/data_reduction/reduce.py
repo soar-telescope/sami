@@ -74,7 +74,7 @@ class Reducer:
             The filename of the master zero that will be used in subtraction.
 
         clean : bool
-            Clean bad collumns by taking the median value of the pixels around
+            Clean bad collumns by taking the _median value of the pixels around
             them.
 
         cosmic_rays : bool
@@ -134,8 +134,60 @@ class Reducer:
 
         return
 
+    def reduce(self, hdu_list, prefix=""):
+
+        # If the number of extensions is just 1, then the file is already
+        # processed.
+        if len(hdu_list) == 1:
+            return hdu_list, ''
+
+        # Merge file
+        data, header, prefix = self.merge(hdu_list)
+
+        # Correct ZERO
+        data, header, prefix = self.correct_zero(
+            data, header, prefix, self.zero_file
+        )
+
+        # Correct DARK
+        data, header, prefix = self.correct_dark(
+            data, header, prefix, self.dark_file
+        )
+
+        # Remove cosmic rays and hot pixels
+        data, header, prefix = self.remove_cosmic_rays(
+            data, header, prefix, self.cosmic_rays
+        )
+
+        # Remove lateral glows
+        data, header, prefix = self.correct_lateral_glow(
+            data, header, prefix, self.glow_file
+        )
+
+        # Correct FLAT
+        data, header, prefix = self.correct_flat(
+            data, header, prefix, self.flat_file
+        )
+
+        # Normalize by the EXPOSURE TIME
+        data, header, prefix = self.divide_by_exposuretime(
+            data, header, prefix, self.time
+        )
+
+        # Clean known bad columns and lines
+        data, header, prefix = self.clean_hot_columns_and_lines(
+            data, header, prefix, self.clean
+        )
+
+        # Add WCS
+        data, header = self.create_wcs(
+            data, header
+        )
+
+        return data, header, prefix
+
     @staticmethod
-    def add_wcs(data, header):
+    def create_wcs(data, header):
         """
         Creates a first guess of the WCS using the telescope coordinates, the
         CCDSUM (binning), position angle and plate scale.
@@ -164,6 +216,9 @@ class Reducer:
         if h['PIXSCAL1'] != h['PIXSCAL2']:
             logger.warning('Pixel scales for X and Y do not mach.')
 
+        if h['OBSTYPE'] != 'OBJECT':
+            return data, header
+
         binning = _np.array([int(b) for b in h['CCDSUM'].split(' ')])
         plate_scale = h['PIXSCAL1'] * u.arcsec
         p = plate_scale.to('degree').value
@@ -188,7 +243,6 @@ class Reducer:
         w.wcs.cdelt = p * binning
         w.wcs.crval = [ra, dec]
         w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
-        # w.wcs.set_pv([(2, 1, 45.0)])
 
         wcs_header = w.to_header()
 
@@ -201,7 +255,7 @@ class Reducer:
         for key in wcs_header.keys():
             header[key] = wcs_header[key]
 
-        return header
+        return data, header
 
     @staticmethod
     def check_header(hdu_list, prefix):
@@ -227,7 +281,7 @@ class Reducer:
     @staticmethod
     def clean_column(_data, x0, y0, yf, n=5):
         """
-        Substitutes a single column by the median of the neighbours columns.
+        Substitutes a single column by the _median of the neighbours columns.
 
         Args:
 
@@ -288,7 +342,7 @@ class Reducer:
     @staticmethod
     def clean_line(_data, x0, xf, y, n=5):
         """
-        Substitutes a single column by the median of the neighbours columns.
+        Substitutes a single column by the _median of the neighbours columns.
 
         Args:
 
@@ -563,8 +617,7 @@ class Reducer:
 
         return data, header, prefix
 
-    @staticmethod
-    def get_header(hdu_source):
+    def get_header(self, hdu_source):
         """
         Return the header of the primary HDU extension of a FITS file.
 
@@ -631,6 +684,9 @@ class Reducer:
         if self.zero_file:
             prefix = 'z' + prefix
 
+        if self.dark_file:
+            prefix = 'd' + prefix
+
         if self.flat_file:
             prefix = 'f' + prefix
 
@@ -689,53 +745,6 @@ class Reducer:
 
         return new_data, header, "m_"
 
-    def reduce(self, hdu_list, prefix=""):
-
-        # If the number of extensions is just 1, then the file is already
-        # processed.
-        if len(hdu_list) == 1:
-            return hdu_list, ''
-
-        # Merge file
-        data, header, prefix = self.merge(hdu_list)
-
-        # Correct ZERO
-        data, header, prefix = self.correct_zero(
-            data, header, prefix, self.zero_file
-        )
-
-        # Correct DARK
-        data, header, prefix = self.correct_dark(
-            data, header, prefix, self.dark_file
-        )
-
-        # Remove cosmic rays and hot pixels
-        data, header, prefix = self.remove_cosmic_rays(
-            data, header, prefix, self.cosmic_rays
-        )
-
-        # Remove lateral glows
-        data, header, prefix = self.correct_lateral_glow(
-            data, header, prefix, self.glow_file
-        )
-
-        # Correct FLAT
-        data, header, prefix = self.correct_flat(
-            data, header, prefix, self.flat_file
-        )
-
-        # Normalize by the EXPOSURE TIME
-        data, header, prefix = self.divide_by_exposuretime(
-            data, header, prefix, self.time
-        )
-
-        # Clean known bad columns and lines
-        data, header, prefix = self.clean_hot_columns_and_lines(
-            data, header, prefix, self.clean
-        )
-
-        return data, header, prefix
-
     @staticmethod
     def remove_cosmic_rays(data, header, prefix, cosmic_rays):
         """
@@ -791,6 +800,10 @@ class Reducer:
         # Copy the bad array in the end (right) of the image).
         data[:, -2:] = temp_column
         return data
+
+    def remove_wcs(self, header):
+
+        return header
 
 
 class SamiReducer(Reducer):
@@ -918,7 +931,7 @@ class SoiReducer(Reducer):
             The filename of the master zero that will be used in subtraction.
 
         clean : bool
-            Clean bad collumns by taking the median value of the pixels around
+            Clean bad collumns by taking the _median value of the pixels around
             them.
 
         cosmic_rays : bool
@@ -1095,7 +1108,7 @@ def _normalize_data(data):
     """
     This method is intended to normalize flat data before it is applied to the
     images that are being reduced. A total of 1000 random points are used to
-    estimate the median level that will be used for normalization.
+    estimate the _median level that will be used for normalization.
 
     Args:
 

@@ -2,7 +2,7 @@
 # -*- coding: utf8 -*-
 import sys
 
-from soar_simager.data_reduction import sami
+from soar_simager.data_reduction import sifs
 from soar_simager.tools import version
 
 __author__ = 'Bruno Quint'
@@ -11,7 +11,7 @@ __version__ = version
 
 def main():
     args = _parse_arguments()
-    sami._main(args.path, debug=args.debug)
+    sifs.data_reduction(args.path, debug=args.debug)
 
 
 def _parse_arguments():

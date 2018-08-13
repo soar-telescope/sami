@@ -17,7 +17,7 @@ def scale_flat_sami(data):
         data (numpy.ndarray) : data used to evaluate the scaling function.
 
     Returns:
-        scale_factor (float) : the inverse of the median of central reagion of
+        scale_factor (float) : the inverse of the _median of central reagion of
         the masked data.
 
     """
@@ -79,11 +79,11 @@ class Combine:
         self._log.warning(message)
 
 
-class ZeroCombine(Combine):
+class DarkCombine(Combine):
 
     def __init__(self, input_list, output_file=None, verbose=False, debug=False):
         """
-        Class created to help combining zero files.
+        Class created to help combining dark files.
 
         Args:
 
@@ -102,19 +102,27 @@ class ZeroCombine(Combine):
 
     def run(self):
 
+        assert isinstance(self.input_list, list)
+
+        if len(self.input_list) == 0:
+            return
+
+        if self.output_filename is not None:
+            assert isinstance(self.output_filename, str)
+
         header = pyfits.getheader(self.input_list[0])
         bx, by = header['CCDSUM'].strip().split()
 
         # Parameter obtained from PySOAR, written by Luciano Fraga
-        master_bias = ccdproc.combine(
+        master_dark = ccdproc.combine(
             self.input_list, method='average', mem_limit=6.4e7,
             minmax_clip=True, unit='adu')
 
         if self.output_filename is None:
-            self.output_filename = "0Zero{}x{}".format(bx, by)
+            self.output_filename = "1Dark{}x{}".format(bx, by)
 
         pyfits.writeto(
-            self.output_filename, master_bias.data, header)
+            self.output_filename, master_dark.data, header)
 
 
 class FlatCombine(Combine):
@@ -144,6 +152,14 @@ class FlatCombine(Combine):
 
     def run(self):
 
+        assert isinstance(self.input_list, list)
+
+        if len(self.input_list) == 0:
+            return
+
+        if self.output_filename is not None:
+            assert isinstance(self.output_filename, str)
+
         header = pyfits.getheader(self.input_list[0])
 
         if header['INSTRUME'] == 'SAM':
@@ -153,7 +169,7 @@ class FlatCombine(Combine):
 
         # Parameter obtained from PySOAR, written by Luciano Fraga
         ccd_data = ccdproc.combine(
-            self.input_list, method='median', mem_limit=6.4e7, sigma_clip=True,
+            self.input_list, method='_median', mem_limit=6.4e7, sigma_clip=True,
             unit='adu', scale=scale_function
         )
 
@@ -170,3 +186,49 @@ class FlatCombine(Combine):
                     binning, filter_name)
 
         pyfits.writeto(self.output_filename, data, header)
+
+
+class ZeroCombine(Combine):
+
+    def __init__(self, input_list, output_file=None, verbose=False, debug=False):
+        """
+        Class created to help combining zero files.
+
+        Args:
+
+            input_list (list) : A list containing the input files.
+
+            output_file (str) : The output filename (optional).
+
+            verbose (bool) : Turn on verbose mode? (default = False)
+
+            debug (bool) : Turn on debug mode? (default = False)
+
+        """
+        Combine.__init__(self, verbose=verbose, debug=debug)
+        self.input_list = input_list
+        self.output_filename = output_file
+
+    def run(self):
+
+        assert isinstance(self.input_list, list)
+
+        if len(self.input_list) == 0:
+            return
+
+        if self.output_filename is not None:
+            assert isinstance(self.output_filename, str)
+
+        header = pyfits.getheader(self.input_list[0])
+        bx, by = header['CCDSUM'].strip().split()
+
+        # Parameter obtained from PySOAR, written by Luciano Fraga
+        master_bias = ccdproc.combine(
+            self.input_list, method='average', mem_limit=6.4e7,
+            minmax_clip=True, unit='adu')
+
+        if self.output_filename is None:
+            self.output_filename = "0Zero{}x{}".format(bx, by)
+
+        pyfits.writeto(
+            self.output_filename, master_bias.data, header)

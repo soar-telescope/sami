@@ -58,6 +58,8 @@ def data_reduction(path, debug=False, quiet=False):
 
     dataframe = process_zero_files(dataframe, reduced_path)
 
+    dataframe = process_dark_files(dataframe, reduced_path)
+
     dataframe = process_flat_files(dataframe, reduced_path)
 
     process_object_files(dataframe, reduced_path)
@@ -85,6 +87,7 @@ def build_table(list_of_files):
             'filter1',
             'filter2',
             'binning',
+            'dark_file',
             'flat_file',
             'zero_file',
         ]
@@ -111,6 +114,7 @@ def build_table(list_of_files):
             'filter1': hdu[0].header['filter1'],
             'filter2': hdu[0].header['filter2'],
             'binning': hdu[1].header['ccdsum'].strip(),
+            'dark_file': None,
             'flat_file': None,
             'zero_file': None,
         })
@@ -183,7 +187,98 @@ def get_binning_used(table):
 
     return list_of_binning
 
- 
+
+def process_dark_files(df, red_path):
+    """
+    Args:
+
+        df (pandas.DataFrame) : a data-frame containing the all the data being
+        processed.
+
+        red_path (str) : the path where the reduced data is stored.
+
+    Returns:
+
+        updated_table (pandas.DataFrame) : an updated data-frame where each
+        file now is attached to the corresponding master Zero file.
+
+    """
+    sami_pipeline = reduce.SamiReducer()
+
+    binning = df.binning.unique()
+
+    for b in binning:
+
+        bx, by = b.split(' ')
+        log.info('Processing DARK files with binning: {} x {}'.format(bx, by))
+
+        mask1 = df.obstype.values == 'DARK'
+        mask2 = df.binning.values == b
+
+        dark_table = df.loc[mask1 & mask2]
+        dark_table = dark_table.sort_values('filename')
+
+        dark_list = []
+        for index, row in dark_table.iterrows():
+
+            sami_pipeline.cosmic_rays = True
+            sami_pipeline.dark_file = None
+            sami_pipeline.flat_file = None
+            sami_pipeline.time = True
+            sami_pipeline.zero_file = row.zero_file
+
+            dark_file = row.filename
+
+            path, fname = os.path.split(dark_file)
+            prefix = sami_pipeline.get_prefix()
+            output_dark_file = os.path.join(red_path, prefix + fname)
+
+            dark_list.append(prefix + fname)
+
+            if os.path.exists(output_dark_file):
+                log.warning('Skipping existing file: {}'.format(
+                    output_dark_file))
+                continue
+
+            log.info('Processing DARK file: {}'.format(dark_file))
+
+            hdul = pyfits.open(dark_file)
+            data, header, prefix = sami_pipeline.reduce(hdul)
+            pyfits.writeto(output_dark_file, data, header)
+
+        if len(dark_list) == 0:
+            continue
+
+        dark_list_name = os.path.join(red_path, "1Dark{}x{}".format(bx, by))
+
+        with open(dark_list_name, 'w') as dark_list_buffer:
+            for dark_file in dark_list:
+                dark_list_buffer.write('{:s}\n'.format(dark_file))
+
+        log.info('Combining ZERO files.')
+        master_dark = dark_list_name + '.fits'
+
+        if os.path.exists(master_dark):
+            log.warning(
+                'Skipping existing MASTER ZERO: {:s}'.format(master_dark))
+
+        else:
+
+            log.info("Writing master zero to: {}".format(master_dark))
+            dark_combine_files = [os.path.join(red_path, f) for f in dark_list]
+
+            dark_combine = combine.DarkCombine(input_list=dark_combine_files,
+                                               output_file=master_dark)
+            dark_combine.run()
+            log.info('Done.')
+
+        mask1 = df['obstype'].values != 'DARK'
+        mask2 = df['binning'].values == b
+        df.loc[mask1 & mask2, 'dark_file'] = master_dark
+
+    return df
+
+
 def process_flat_files(df, red_path):
     """
     Args:
@@ -228,6 +323,7 @@ def process_flat_files(df, red_path):
             for index, row in filter_flat_df.iterrows():
 
                 sami_pipeline.zero_file = row.zero_file
+                sami_pipeline.dark_file = row.dark_file
                 sami_pipeline.flat_file = None
                 flat_file = row.filename
                 prefix = sami_pipeline.get_prefix()
@@ -246,6 +342,9 @@ def process_flat_files(df, red_path):
                 hdul = pyfits.open(flat_file)
                 data, header, prefix = sami_pipeline.reduce(hdul)
                 pyfits.writeto(output_flat, data, header)
+
+            if len(flat_list) == 0:
+                continue
 
             flat_list_name = os.path.join(
                 red_path, "1FLAT_{}x{}_{}".format(bx, by, _filter))
@@ -300,6 +399,7 @@ def process_object_files(df, red_path):
     for index, row in object_df.iterrows():
 
         sami_pipeline.zero_file = row.zero_file
+        sami_pipeline.dark_file = row.dark_file
         sami_pipeline.flat_file = row.flat_file
         obj_file = row.filename
 
@@ -375,6 +475,9 @@ def process_zero_files(df, red_path):
             hdul = pyfits.open(zero_file)
             data, header, prefix = sami_pipeline.reduce(hdul)
             pyfits.writeto(output_zero_file, data, header)
+
+        if len(zero_list) == 0:
+                continue
 
         zero_list_name = os.path.join(red_path, "0Zero{}x{}".format(bx, by))
 

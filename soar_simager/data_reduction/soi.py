@@ -187,7 +187,7 @@ def process_flat_files(df, red_path):
                 d = soi_merger.merge(flat_file)
                 h = soi_merger.get_header(flat_file)
 
-                d, h, p = soi_merger.reduce(d, h)
+                d, h, p = soi_merger.__reduce(d, h)
                 pyfits.writeto(output_flat, d, h)
 
             flat_list_name = os.path.join(
@@ -257,9 +257,9 @@ def process_object_files(df, red_path):
 
         d = soi_merger.merge(obj_file)
         h = soi_merger.get_header(obj_file)
-        h = soi_merger.add_wcs(d, h)
+        h = soi_merger.create_wcs(d, h)
 
-        d, h, p = soi_merger.reduce(d, h)
+        d, h, p = soi_merger.__reduce(d, h)
 
         pyfits.writeto(output_obj_file, d, h)
 
@@ -322,7 +322,7 @@ def process_zero_files(df, red_path):
 
             log.debug('Data format: {0[0]:d} x {0[1]:d}'.format(data.shape))
 
-            data, header, prefix = soi_merger.reduce(data, header)
+            data, header, prefix = soi_merger.__reduce(data, header)
             pyfits.writeto(output_zero_file, data, header)
 
         zero_list_name = os.path.join(red_path, "0Zero{}x{}".format(bx, by))
