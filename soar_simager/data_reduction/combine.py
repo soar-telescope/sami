@@ -17,7 +17,7 @@ def scale_flat_sami(data):
         data (numpy.ndarray) : data used to evaluate the scaling function.
 
     Returns:
-        scale_factor (float) : the inverse of the _median of central reagion of
+        scale_factor (float) : the inverse of the median of central reagion of
         the masked data.
 
     """
@@ -169,7 +169,7 @@ class FlatCombine(Combine):
 
         # Parameter obtained from PySOAR, written by Luciano Fraga
         ccd_data = ccdproc.combine(
-            self.input_list, method='_median', mem_limit=6.4e7, sigma_clip=True,
+            self.input_list, method='median', mem_limit=6.4e7, sigma_clip=True,
             unit='adu', scale=scale_function
         )
 
@@ -223,9 +223,14 @@ class ZeroCombine(Combine):
         bx, by = header['CCDSUM'].strip().split()
 
         # Parameter obtained from PySOAR, written by Luciano Fraga
-        master_bias = ccdproc.combine(
-            self.input_list, method='average', mem_limit=6.4e7,
-            minmax_clip=True, unit='adu')
+        try:
+            master_bias = ccdproc.combine(
+                self.input_list, method='average', mem_limit=6.4e7,
+                minmax_clip=True, unit='adu')
+        except ZeroDivisionError:
+            raise RuntimeError('CCDProc.combine raised an error. '
+                               'Try again with a different number of input '
+                               'files')
 
         if self.output_filename is None:
             self.output_filename = "0Zero{}x{}".format(bx, by)
