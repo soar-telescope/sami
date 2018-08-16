@@ -110,7 +110,6 @@ setup(
     scripts=[
         'bin/reduce_sami',
         'bin/reduce_soi',
-        'bin/quick_astrometry',
 ],
 
 )

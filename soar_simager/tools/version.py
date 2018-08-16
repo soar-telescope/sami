@@ -15,14 +15,17 @@ v0.1.5 - sami_autoastrometry fixed (AGAIN!!).
        - Skipping existing object files.
 v0.2.0 - Refactored code using Pandas and DataFrames.
        - Works with SOI!!
+v0.2.1 - Reducer is now inherited by SamiReducer and SoiReducer.
+       - SoiReducer still needs tests.
+       - SamiReducer removed the bad columns at the center.
 """
 import calendar
 
 api = 0
 feature = 2
-bug = 0
+bug = 1
 
-month = 7
+month = 8
 year = 2018
 
 month = calendar.month_name[month]

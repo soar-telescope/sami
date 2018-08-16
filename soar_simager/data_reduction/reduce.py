@@ -780,33 +780,69 @@ class Reducer:
         return data, header, prefix
 
     @staticmethod
-    def remove_central_bad_columns(data):
-        """
-        Remove central bad columns at the interface of the four extensions.
-
-        Parameter
-        ---------
-            data : numpy.ndarray
-                2D Array containing the data.
-        """
-        n_rows, n_columns = data.shape
-
-        # Copy the central bad columns to a temp array
-        temp_column = data[:, n_columns // 2 - 1:n_columns // 2 + 1]
-
-        # Shift the whole image by two columns
-        data[:, n_columns // 2 - 1:-2] = data[:, n_columns // 2 + 1:]
-
-        # Copy the bad array in the end (right) of the image).
-        data[:, -2:] = temp_column
-        return data
-
-    def remove_wcs(self, header):
+    def remove_wcs(header):
 
         return header
 
 
 class SamiReducer(Reducer):
+
+    def reduce(self, hdu_list, prefix=""):
+
+        # If the number of extensions is just 1, then the file is already
+        # processed.
+        if len(hdu_list) == 1:
+            return hdu_list, ''
+
+        # Merge file
+        data, header, prefix = self.merge(hdu_list)
+
+        # Removing bad column and line
+        data, header, prefix = self.remove_central_bad_columns(
+            data, header, prefix,
+        )
+
+        # Correct ZERO
+        data, header, prefix = self.correct_zero(
+            data, header, prefix, self.zero_file
+        )
+
+        # Correct DARK
+        data, header, prefix = self.correct_dark(
+            data, header, prefix, self.dark_file
+        )
+
+        # Remove cosmic rays and hot pixels
+        data, header, prefix = self.remove_cosmic_rays(
+            data, header, prefix, self.cosmic_rays
+        )
+
+        # Remove lateral glows
+        data, header, prefix = self.correct_lateral_glow(
+            data, header, prefix, self.glow_file
+        )
+
+        # Correct FLAT
+        data, header, prefix = self.correct_flat(
+            data, header, prefix, self.flat_file
+        )
+
+        # Normalize by the EXPOSURE TIME
+        data, header, prefix = self.divide_by_exposuretime(
+            data, header, prefix, self.time
+        )
+
+        # Clean known bad columns and lines
+        data, header, prefix = self.clean_hot_columns_and_lines(
+            data, header, prefix, self.clean
+        )
+
+        # Add WCS
+        data, header = self.create_wcs(
+            data, header
+        )
+
+        return data, header, prefix
 
     def clean_columns(self, data, header):
         """
@@ -913,8 +949,31 @@ class SamiReducer(Reducer):
 
         return data
 
+    @staticmethod
+    def remove_central_bad_columns(data, header, prefix):
+        """
+        Remove central bad columns at the interface of the four extensions.
 
-class SifsReducer(Reducer):
+        Parameter
+        ---------
+            data : numpy.ndarray
+                2D Array containing the data.
+        """
+        n_rows, n_columns = data.shape
+
+        # Copy the central bad columns to a temp array
+        temp_column = data[:, n_columns // 2 - 1:n_columns // 2 + 1]
+
+        # Shift the whole image by two columns
+        data[:, n_columns // 2 - 1:-2] = data[:, n_columns // 2 + 1:]
+
+        # Copy the bad array in the end (right) of the image).
+        data[:, -2:] = temp_column
+
+        return data, header, prefix
+
+
+class SifsReducer(SamiReducer):
     pass
 
 
