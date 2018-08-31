@@ -40,6 +40,7 @@ from scipy import stats
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy import modeling
 
 from soar_simager.io import pyfits as _pyfits
 from soar_simager.io.logging import get_logger
@@ -694,7 +695,21 @@ class Reducer:
 
     def merge(self,  hdul):
         """
-        Open a FITS image and try to join its extensions in a single array.
+        Open a FITS image and try to join its extensions in a single array. This
+        method relies on keywords that can be found on SAMI/SOI/SIFS' header:
+
+        DATASEC - Section that contains the data. The values here consider
+        binning and are related to the current CCD.
+
+        BIASSEC - Section that contains the overscan region. The values here
+        consider binning and are realated to the current CCD.
+
+        CCDSEC - Section that relates the current extension to the **current
+        CCD**. Does not consider binning.
+
+        AMPSEC - Section that tells us how the readout direction. Does
+
+        TRIMSEC,DETSEC,CCDSIZE
 
         Args:
 
@@ -731,8 +746,10 @@ class Reducer:
 
             # Fit and remove OVERSCAN
             x = _np.arange(bias.size) + 1
-            bias_fit_pars = _np.polyfit(x, bias, 2)  # Last par = inf
+
+            bias_fit_pars = _np.polyfit(x[100:-100], bias[100:-100], 2)  # Last par = inf
             bias_fit = _np.polyval(bias_fit_pars, x)
+
             bias_fit = bias_fit.reshape((bias_fit.size, 1))
             bias_fit = _np.repeat(bias_fit, trim.shape[1], axis=1)
 
@@ -1104,14 +1121,16 @@ class SoiReducer(Reducer):
 
         return _data
 
-    def clean_lines(self, hdu_list):
+    def clean_lines(self, data, header):
         """
         Clean the known bad lines that exists in most of SAMI's, SOI's or
         SIFS's data. This method is meant to be overwritten via inheritance.
 
         Args:
 
-            hdu_list (astropy.io.fits.HDUList)
+            data (numpy.ndarray) : A 2D numpy array that contains the data.
+
+            header (astropy.io.fits.Header) : A header that will be updated.
 
         See also:
 
@@ -1119,19 +1138,10 @@ class SoiReducer(Reducer):
             Reducer.clean_line
             Reducer.clean_lines
         """
-        if not isinstance(hdu_list, _pyfits.HDUList):
-            raise TypeError('Please, use a HDUList as input')
+        binning = header['CCDSUM'].split(' ')[0]
+        binning = int(binning.strip())
 
-        if len(hdu_list) != 5:
-            raise ValueError(
-                "HDUList is expected to have 1 + 4 elements. Found {}".format(
-                    len(hdu_list)))
-
-        for i in range(1, len(hdu_list)):
-
-            _data = hdu_list[i].data
-            _hdr = hdu_list[i].header
-
+        if binning == 4:
             bad_lines = [
                 # [166, 206, 282],
                 # [212, 258, 689],
@@ -1152,15 +1162,17 @@ class SoiReducer(Reducer):
                 # [904, 920, 396]
             ]
 
-            for line in bad_lines:
-                x0 = line[0]
-                xf = line[1]
-                y = line[2]
-                _data = self.clean_line(_data, x0, xf, y)
+        else:
+            bad_lines = []
 
-            hdu_list[i].data = _data
+        for line in bad_lines:
+            x0 = line[0]
+            xf = line[1]
+            y = line[2]
+            data = self.clean_line(data, x0, xf, y)
 
-        return hdu_list
+        return data
+
 
 
 def _normalize_data(data):

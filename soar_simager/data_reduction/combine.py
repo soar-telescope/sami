@@ -33,6 +33,27 @@ def scale_flat_sami(data):
     return scale_factor
 
 
+def scale_flat_soi(data):
+    """
+    Args:
+        data (numpy.ndarray) : data used to evaluate the scaling function.
+
+    Returns:
+        scale_factor (float) : the inverse of the median of central reagion of
+        the masked data.
+
+    """
+    data = np.ma.masked_invalid(data)
+    h, w = data.shape
+
+    c1, c2 = w // 2 - w // 10, w // 2 + w // 10
+
+    data = data[:, c1:c2]
+    scale_factor = 1. / np.ma.median(data)
+
+    return scale_factor
+
+
 class Combine:
 
     def __init__(self, verbose=False, debug=False):
@@ -162,8 +183,10 @@ class FlatCombine(Combine):
 
         header = pyfits.getheader(self.input_list[0])
 
-        if header['INSTRUME'] == 'SAM':
+        if header['INSTRUME'].strip() == 'SAM':
             scale_function = scale_flat_sami
+        elif header['INSTRUME'].strip() == 'SOI':
+            scale_function = scale_flat_soi
 
         # TODO - Scale Function for SOI and SIFS
 
@@ -185,7 +208,7 @@ class FlatCombine(Combine):
                 '1NSFLAT{0:d}x{0:d}_{1:s}.fits'.format(
                     binning, filter_name)
 
-        pyfits.writeto(self.output_filename, data, header)
+        pyfits.writeto(self.output_filename, data.data, header)
 
 
 class ZeroCombine(Combine):
@@ -227,6 +250,7 @@ class ZeroCombine(Combine):
             master_bias = ccdproc.combine(
                 self.input_list, method='average', mem_limit=6.4e7,
                 minmax_clip=True, unit='adu')
+
         except ZeroDivisionError:
             raise RuntimeError('CCDProc.combine raised an error. '
                                'Try again with a different number of input '
@@ -236,4 +260,4 @@ class ZeroCombine(Combine):
             self.output_filename = "0Zero{}x{}".format(bx, by)
 
         pyfits.writeto(
-            self.output_filename, master_bias.data, header)
+            self.output_filename, master_bias.data.data, header)

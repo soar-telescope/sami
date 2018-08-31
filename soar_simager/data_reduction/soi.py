@@ -26,6 +26,43 @@ __author__ = 'Bruno Quint'
 KEYWORDS = ["OBSTYPE", "FILTERS", "CCDSUM"]
 
 
+def data_reduction(path, debug=False, quiet=False):
+    """
+    Main method for SOI data reduction pipeline.
+
+    Args:
+         path (str) : path to the directory which contains the data.
+
+         debug (bool, optional) : enable debug mode (default = False).
+
+         quiet (bool, optional) : disable printing on screen (default = False).
+    """
+
+    if debug:
+        log.setLevel('DEBUG')
+    elif quiet:
+        log.setLevel('NOTSET')
+    else:
+        log.setLevel('INFO')
+
+    log.info('SOAR Imager Data-Reduction Pipeline')
+    log.info('Version {}'.format(version.__str__))
+
+    reduced_path = create_reduced_folder(os.path.join(path, 'RED'))
+
+    list_of_files = glob.glob(os.path.join(path, '*.fits'))
+
+    table = build_table(list_of_files)
+
+    table = filter_files(table)
+
+    table = process_zero_files(table, reduced_path)
+
+    table = process_flat_files(table, reduced_path)
+
+    process_object_files(table, reduced_path)
+
+
 def build_table(list_of_files):
     """
     Return a pandas.DataFrame used to organize the pipeline.
@@ -102,6 +139,29 @@ def create_reduced_folder(path):
     return path
 
 
+def filter_files(df):
+    """
+    Remove files that are not obtained with SOI from the data-frame.
+
+    Args:
+        df (pandas.DataFrame)
+
+    Returns:
+        filtered_df (pandas.DataFrame)
+    """
+    log.info('Checking how many files obtained with SOI')
+
+    n_total = len(df.index)
+    df = df[df.instrume == 'SOI']
+    n_processed = len(df.index)
+    n_rejected = n_total - n_processed
+
+    log.info('Number of files to be processed: {:d}'.format(n_processed))
+    log.info('Number of files rejected: {:d}'.format(n_rejected))
+
+    return df
+
+
 def get_binning_used(table):
     """
     Get all the binning modes used during the observation night.
@@ -124,6 +184,97 @@ def get_binning_used(table):
     return list_of_binning
 
 
+def process_dark_files(df, red_path):
+    """
+    Args:
+
+        df (pandas.DataFrame) : a data-frame containing the all the data being
+        processed.
+
+        red_path (str) : the path where the reduced data is stored.
+
+    Returns:
+
+        updated_table (pandas.DataFrame) : an updated data-frame where each
+        file now is attached to the corresponding master Zero file.
+
+    """
+    sami_pipeline = reduce.SamiReducer()
+
+    binning = df.binning.unique()
+
+    for b in binning:
+
+        bx, by = b.split(' ')
+        log.info('Processing DARK files with binning: {} x {}'.format(bx, by))
+
+        mask1 = df.obstype.values == 'DARK'
+        mask2 = df.binning.values == b
+
+        dark_table = df.loc[mask1 & mask2]
+        dark_table = dark_table.sort_values('filename')
+
+        dark_list = []
+        for index, row in dark_table.iterrows():
+
+            sami_pipeline.cosmic_rays = True
+            sami_pipeline.dark_file = None
+            sami_pipeline.flat_file = None
+            sami_pipeline.time = True
+            sami_pipeline.zero_file = row.zero_file
+
+            dark_file = row.filename
+
+            path, fname = os.path.split(dark_file)
+            prefix = sami_pipeline.get_prefix()
+            output_dark_file = os.path.join(red_path, prefix + fname)
+
+            dark_list.append(prefix + fname)
+
+            if os.path.exists(output_dark_file):
+                log.warning('Skipping existing file: {}'.format(
+                    output_dark_file))
+                continue
+
+            log.info('Processing DARK file: {}'.format(dark_file))
+
+            hdul = pyfits.open(dark_file)
+            data, header, prefix = sami_pipeline.reduce(hdul)
+            pyfits.writeto(output_dark_file, data, header)
+
+        if len(dark_list) == 0:
+            continue
+
+        dark_list_name = os.path.join(red_path, "1Dark{}x{}".format(bx, by))
+
+        with open(dark_list_name, 'w') as dark_list_buffer:
+            for dark_file in dark_list:
+                dark_list_buffer.write('{:s}\n'.format(dark_file))
+
+        log.info('Combining ZERO files.')
+        master_dark = dark_list_name + '.fits'
+
+        if os.path.exists(master_dark):
+            log.warning(
+                'Skipping existing MASTER ZERO: {:s}'.format(master_dark))
+
+        else:
+
+            log.info("Writing master zero to: {}".format(master_dark))
+            dark_combine_files = [os.path.join(red_path, f) for f in dark_list]
+
+            dark_combine = combine.DarkCombine(input_list=dark_combine_files,
+                                               output_file=master_dark)
+            dark_combine.run()
+            log.info('Done.')
+
+        mask1 = df['obstype'].values != 'DARK'
+        mask2 = df['binning'].values == b
+        df.loc[mask1 & mask2, 'dark_file'] = master_dark
+
+    return df
+
+
 def process_flat_files(df, red_path):
     """
     Args:
@@ -136,8 +287,8 @@ def process_flat_files(df, red_path):
         file now is attached to the corresponding master Zero file.
     """
     log.info('Processing FLAT files (SFLAT + DFLAT)')
-    soi_merger = reduce.SoiReducer()
-    soi_merger.clean = True
+    soi_pipeline = reduce.SoiReducer()
+    soi_pipeline.clean = True
 
     binning = df.binning.unique()
 
@@ -168,10 +319,10 @@ def process_flat_files(df, red_path):
             flat_list = []
             for index, row in filter_flat_df.iterrows():
 
-                soi_merger.zero_file = row.zero_file
-                soi_merger.flat_file = None
+                soi_pipeline.zero_file = row.zero_file
+                soi_pipeline.flat_file = None
                 flat_file = row.filename
-                prefix = soi_merger.get_prefix()
+                prefix = soi_pipeline.get_prefix()
 
                 path, fname = os.path.split(flat_file)
                 output_flat = os.path.join(red_path, prefix + fname)
@@ -184,11 +335,9 @@ def process_flat_files(df, red_path):
 
                 log.info('Processing FLAT file: {}'.format(flat_file))
 
-                d = soi_merger.merge(flat_file)
-                h = soi_merger.get_header(flat_file)
-
-                d, h, p = soi_merger.__reduce(d, h)
-                pyfits.writeto(output_flat, d, h)
+                hdul = pyfits.open(flat_file)
+                data, header, prefix = soi_pipeline.reduce(hdul)
+                pyfits.writeto(output_flat, data, header)
 
             flat_list_name = os.path.join(
                 red_path, "1FLAT_{}x{}_{}".format(bx, by, _filter))
@@ -205,12 +354,13 @@ def process_flat_files(df, red_path):
             else:
                 log.info('Writing master FLAT to file: {}'.format(master_flat))
 
-            flat_combine_files = [os.path.join(red_path, f) for f in flat_list]
+                flat_combine_files = \
+                    [os.path.join(red_path, f) for f in flat_list]
 
-            flat_combine = combine.FlatCombine(
-                 input_list=flat_combine_files, output_file=master_flat)
+                flat_combine = combine.FlatCombine(
+                     input_list=flat_combine_files, output_file=master_flat)
 
-            flat_combine.run()
+                flat_combine.run()
 
             mask1 = df['obstype'].values == 'OBJECT'
             mask2 = df['binning'].values == b
@@ -230,9 +380,9 @@ def process_object_files(df, red_path):
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    soi_merger = reduce.SoiReducer()
-    soi_merger.cosmic_rays = True
-    soi_merger.clean = True
+    soi_pipeline = reduce.SoiReducer()
+    soi_pipeline.cosmic_rays = True
+    soi_pipeline.clean = True
 
     log.info('Processing OBJECT files.')
 
@@ -240,12 +390,12 @@ def process_object_files(df, red_path):
 
     for index, row in object_df.iterrows():
 
-        soi_merger.zero_file = row.zero_file
-        soi_merger.flat_file = row.flat_file
+        soi_pipeline.zero_file = row.zero_file
+        soi_pipeline.flat_file = row.flat_file
         obj_file = row.filename
 
         path, fname = os.path.split(obj_file)
-        prefix = soi_merger.get_prefix()
+        prefix = soi_pipeline.get_prefix()
         output_obj_file = os.path.join(path, 'RED', prefix + fname)
 
         if os.path.exists(output_obj_file):
@@ -255,13 +405,9 @@ def process_object_files(df, red_path):
 
         log.info('Processing OBJECT file: {}'.format(obj_file))
 
-        d = soi_merger.merge(obj_file)
-        h = soi_merger.get_header(obj_file)
-        h = soi_merger.create_wcs(d, h)
-
-        d, h, p = soi_merger.__reduce(d, h)
-
-        pyfits.writeto(output_obj_file, d, h)
+        hdul = pyfits.open(obj_file)
+        data, header, prefix = soi_pipeline.reduce(hdul)
+        pyfits.writeto(output_obj_file, data, header)
 
     return df
 
@@ -277,7 +423,8 @@ def process_zero_files(df, red_path):
         updated_table (pandas.DataFrame) : an updated data-frame where each
         file now is attached to the corresponding master Zero file.
     """
-    soi_merger = reduce.SoiReducer()
+    soi_pipeline = reduce.SoiReducer()
+    soi_pipeline.cosmic_rays = True
 
     binning = df.binning.unique()
 
@@ -299,13 +446,13 @@ def process_zero_files(df, red_path):
         zero_list = []
         for index, row in zero_table.iterrows():
 
-            soi_merger.zero_file = None
-            soi_merger.flat_file = None
-            soi_merger.clean = True
+            soi_pipeline.zero_file = None
+            soi_pipeline.flat_file = None
+            soi_pipeline.clean = True
             zero_file = row.filename
 
             path, fname = os.path.split(zero_file)
-            prefix = soi_merger.get_prefix()
+            prefix = soi_pipeline.get_prefix()
             output_zero_file = os.path.join(red_path, prefix + fname)
 
             zero_list.append(prefix + fname)
@@ -317,12 +464,8 @@ def process_zero_files(df, red_path):
 
             log.info('Processing ZERO file: {}'.format(zero_file))
 
-            data = soi_merger.merge(zero_file)
-            header = soi_merger.get_header(zero_file)
-
-            log.debug('Data format: {0[0]:d} x {0[1]:d}'.format(data.shape))
-
-            data, header, prefix = soi_merger.__reduce(data, header)
+            hdul = pyfits.open(zero_file)
+            data, header, prefix = soi_pipeline.reduce(hdul)
             pyfits.writeto(output_zero_file, data, header)
 
         zero_list_name = os.path.join(red_path, "0Zero{}x{}".format(bx, by))
@@ -351,55 +494,5 @@ def process_zero_files(df, red_path):
         mask1 = df['obstype'].values != 'ZERO'
         mask2 = df['binning'].values == b
         df.loc[mask1 & mask2, 'zero_file'] = master_zero
-
-    return df
-
-
-def reduce(path, debug=False, quiet=False):
-
-    if debug:
-        log.setLevel('DEBUG')
-    elif quiet:
-        log.setLevel('NOTSET')
-    else:
-        log.setLevel('INFO')
-
-    log.info('SOAR Imager Data-Reduction Pipeline')
-    log.info('Version {}'.format(version.__str__))
-
-    reduced_path = create_reduced_folder(os.path.join(path, 'RED'))
-
-    list_of_files = glob.glob(os.path.join(path, '*.fits'))
-
-    table = build_table(list_of_files)
-
-    table = filter_files(table)
-
-    table = process_zero_files(table, reduced_path)
-
-    table = process_flat_files(table, reduced_path)
-
-    process_object_files(table, reduced_path)
-
-
-def filter_files(df):
-    """
-    Remove files that are not obtained with SOI from the data-frame.
-
-    Args:
-        df (pandas.DataFrame)
-
-    Returns:
-        filtered_df (pandas.DataFrame)
-    """
-    log.info('Checking how many files obtained with SOI')
-
-    n_total = len(df.index)
-    df = df[df.instrume == 'SOI']
-    n_processed = len(df.index)
-    n_rejected = n_total - n_processed
-
-    log.info('Number of files to be processed: {:d}'.format(n_processed))
-    log.info('Number of files rejected: {:d}'.format(n_rejected))
 
     return df

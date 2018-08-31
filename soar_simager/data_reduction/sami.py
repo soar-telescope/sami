@@ -26,7 +26,6 @@ KEYWORDS = ["OBSTYPE", "FILTERS", "CCDSUM"]
 
 
 def data_reduction(path, debug=False, quiet=False):
-
     """
     Main method for SAMI data reduction pipeline.
 
@@ -361,12 +360,12 @@ def process_flat_files(df, red_path):
             else:
                 log.info('Writing master FLAT to file: {}'.format(master_flat))
 
-            flat_combine_files = [os.path.join(red_path, f) for f in flat_list]
+                flat_combine_files = [os.path.join(red_path, f) for f in flat_list]
 
-            flat_combine = combine.FlatCombine(
-                 input_list=flat_combine_files, output_file=master_flat)
+                flat_combine = combine.FlatCombine(
+                     input_list=flat_combine_files, output_file=master_flat)
 
-            flat_combine.run()
+                flat_combine.run()
 
             mask1 = df['obstype'].values == 'OBJECT'
             mask2 = df['binning'].values == b
