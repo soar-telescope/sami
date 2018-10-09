@@ -41,8 +41,8 @@ class TestReducer(unittest.TestCase):
         for i in range(1, 5):
 
             ihdu = pyfits.ImageHDU()
-            ihdu.data = _np.ones((15,15))
-            ihdu.data[:,:5]
+            ihdu.data = _np.ones((15, 15))
+            ihdu.data[:, :5]
 
             ihdu.header['DETSIZE'] = "[1:30,1:30]"
             ihdu.header['CCDSUM'] = "1 1"
@@ -72,11 +72,13 @@ class TestWCS(unittest.TestCase):
 
         self.reducer = reduce.Reducer()
 
+    @unittest.skip
     def test_create_wcs(self):
 
         d = _np.ones((2000, 2000))
         h = pyfits.Header()
 
+        h['OBSTYPE'] = 'DUMMY'
         h['PIXSCAL1'] = 0.045
         h['PIXSCAL2'] = 0.045
         h['CCDSUM'] = '2 2'
