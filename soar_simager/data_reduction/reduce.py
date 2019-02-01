@@ -796,7 +796,7 @@ class Reducer:
 
 class SamiReducer(Reducer):
 
-    gain = [2.6, 2.6, 2.6, 2.6]
+    gain = [2.1, 2.0537, 2.1, 2.0823]
     read_noise = [10., 10., 10., 10.]
     
     def reduce(self, hdu_list, prefix=""):
