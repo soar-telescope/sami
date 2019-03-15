@@ -18,15 +18,18 @@ v0.2.0 - Refactored code using Pandas and DataFrames.
 v0.2.1 - Reducer is now inherited by SamiReducer and SoiReducer.
        - SoiReducer still needs tests.
        - SamiReducer removed the bad columns at the center.
+v0.2.2 - Fixed bug that caused all the objects to be reduced using the same
+         master flat.
+       - Added feature that prints the data frame to a HTML file.
 """
 import calendar
 
 api = 0
 feature = 2
-bug = 1
+bug = 2
 
-month = 8
-year = 2018
+month = 3
+year = 2019
 
 month = calendar.month_name[month]
 __str__ = "{api:d}.{feature:d}.{bug:d} - {month:s}, {year:d}".format(**locals())

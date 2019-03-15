@@ -64,6 +64,10 @@ def data_reduction(path, debug=False, quiet=False):
 
     process_object_files(dataframe, reduced_path)
 
+    write_dataframe_to_html(dataframe)
+
+    log.info("All done.")
+
     
 def build_table(list_of_files):
     """
@@ -370,7 +374,8 @@ def process_flat_files(df, red_path):
 
             mask1 = df['obstype'].values == 'OBJECT'
             mask2 = df['binning'].values == b
-            df.loc[mask1 & mask2, 'flat_file'] = master_flat
+            mask3 = df['filters'].values == _filter
+            df.loc[mask1 & mask2 & mask3, 'flat_file'] = master_flat
 
     return df
 
@@ -507,3 +512,34 @@ def process_zero_files(df, red_path):
         df.loc[mask1 & mask2, 'zero_file'] = master_zero
 
     return df
+
+
+def write_dataframe_to_html(df):
+    """
+    Writes the dataframe as a HTML file for debugging.
+
+    Parameters
+    ----------
+        df : pandas.DataFrame
+    """
+    html_file_name = 'sami_reduce.html'
+
+    with open(html_file_name, 'w') as f:
+        df.to_html(
+            buf=f,
+            table_id='sami_reduce',
+            columns=[
+                'filename',
+                'instrume',
+                'binning',
+                'filter1',
+                'filter2',
+                'filters',
+                'obstype',
+                'zero_file',
+                'dark_file',
+                'flat_file',
+            ]
+        )
+
+    log.info("Saved dataframe to file: {}".format(html_file_name))
