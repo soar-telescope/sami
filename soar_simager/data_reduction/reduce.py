@@ -100,6 +100,15 @@ class Reducer:
         verbose : bool
             Turn on verbose mode (not so talktive as debug mode).
 
+    Attributes
+    ----------
+        gain : list
+            A list containing the gain that converts ADU values to eletrons for 
+            each simager amplifier.
+            
+        read_noise : list
+            A list containing the read noise on each simager amplifier.
+
     See also
     --------
         LACosmic - http://www.astro.yale.edu/dokkum/lacosmic/
@@ -787,6 +796,9 @@ class Reducer:
 
 class SamiReducer(Reducer):
 
+    gain = [2.1, 2.0537, 2.1, 2.0823]
+    read_noise = [10., 10., 10., 10.]
+    
     def reduce(self, hdu_list, prefix=""):
 
         # If the number of extensions is just 1, then the file is already
