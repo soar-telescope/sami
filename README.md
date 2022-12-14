@@ -4,40 +4,51 @@
 [![Coverage Status](https://coveralls.io/repos/github/soar-telescope/sami/badge.svg?branch=master)](https://coveralls.io/github/soar-telescope/sami?branch=master)
 
 This is a new pipeline for the SAM Imager using pure Python and
-libraries. At the moment, this pipeline is intended to be used locally
-so a installation have to be performed. As this is an active project, you mind
-find that several features are still to be implemented.
+libraries created by [B. Quint](https://github.com/b1quint) and
+further improved by [F. Navarete](https://github.com/navarete).
+At the moment, this pipeline is intended to be used locally
+so a installation have to be performed. As this is an active project,
+you will  find that several features are still to be implemented.
 
 ## Install
 
-  The simplest way to use the SAMI Data-Reduction Pipeline is using [astroconda](https://astroconda.readthedocs.io/en/latest/), since it contains most of the packages needed. Once you have it installed, you can activate the virtual environment by typing:
+  The simplest way to use the SAMI Data-Reduction Pipeline is using [astroconda](https://astroconda.readthedocs.io/en/latest/),
+  since it contains most of the packages needed.
+  Once you have it installed, you can create a new virtual environment. As an example, we will create the environment ```sami_pipeline```:
+  ```
+  $ conda create --name sami_pipeline
+  ```
+
+  Then, activate the `astroconda` virtual environment by typing: 
+
+  ```
+  $ source activate sami_pipeline
+  ```
   
-  ```
-  $ source activate my_virtual_env
-  ```
-  
-  [astroconda](https://astroconda.readthedocs.io/en/latest/) contains almost all the packages you need to run the SAMI Data-Reduction Pipeline but you will still need `astropy:ccdproc`. To solve this, activate the `astroconda` virtual environment and install it using the following command:
+  Once logged into the new conda environment, install the Python packages `astropy:ccdproc:pandas` using the following command:
 
   ```
-  (my_virtual_env) $ conda install -c astropy ccdproc
+  (sami_pipeline) $ conda install -c astropy ccdproc pandas
   ```
 
-  Once you are done, you can download the [SAMI Data-Reduction Pipeline](https://github.com/soar-telescope/sami/archive/master.zip) and extract it somewhere into your computer. Go to where you extracted it and check if you have all the required packages by typing:
+  Once you are done, you can download the [SAMI Data-Reduction Pipeline](https://github.com/soar-telescope/sami/archive/master.zip)
+  and extract it somewhere into your computer.
+  Go to the directory where you extracted it and check if you have all the required packages by typing:
 
   ```
-  (my_virtual_env) path_to_the_samidr $ python setup.py test
+  (sami_pipeline) path_to_the_samidr $ python setup.py test
   ```
 
   If you receive no error, you can install the package using `pip`:
 
   ```
-  (my_virtual_env) path_to_the_samidr $ pip install .
+  (sami_pipeline) path_to_the_samidr $ pip install .
   ```
 
   If you are updating the SAMI Data-Reduction Pipeline, you must type:
 
   ```
-  (my_virtual_env) path_to_the_samidr $ pip install --upgrade .
+  (sami_pipeline) path_to_the_samidr $ pip install --upgrade .
   ```
 
 ## Use
@@ -46,10 +57,12 @@ find that several features are still to be implemented.
   by the following command:
 
   ```
-  (my_virtual_env) $ reduce_sami $path_to_data
+  (sami_pipeline) $ reduce_sami $path_to_data --outfolder $path_to_reduced_data
   ```
 
-  Where `$path_to_data` is the path to the directory that contains SAMI data.
+  Where `$path_to_data` is the path to the directory that contains SAMI data and
+  `$path_to_reduced_data` is the directory to save the processed data
+  (this is useful in case you are not allowed to modify the path containing the raw data).
 
   Note that the pipeline does not perform any type of data quality at the moment
   so you might check your files to avoid bad data like saturated or empty
@@ -63,15 +76,18 @@ find that several features are still to be implemented.
 ### Data Reduction
 
  Once installed, you can call the data reduction software using a
- terminal by typing `sreduce-sami $PATH`, where `$PATH` is a directory
+ terminal by typing `reduce_sami $PATH`, where `$PATH` is a directory
  containing raw files. The processed data will be stored into a new
- folder called `$PATH\RED`. Each file will receive a prefix accordingly
+ folder called `$PATH\RED`. Now, you can also define the directory that will
+ contain the processed data by typing `reduce_sami $PATH --outfolder $PATH_RED`,
+ where `$PATH_RED` is the new directory with the processed data.
+ Each file will receive a prefix accordingly
  to the corrections applied.
 
  Here are the data reduction processed steps:
 
- 1) Overscan correction: reduce-sami sum each overscan row and fit a
- 3rd degree polynomium to the result. This polynomium is then subtracted
+ 1) Overscan correction: `reduce_sami` sum each overscan row and fit a
+ 3rd degree polynomial function to the result. This fit is then subtracted
  from each column on each extension.
 
  2) Move the overscan region to the outer edges of the detector and
@@ -82,8 +98,10 @@ find that several features are still to be implemented.
 
  4) ZERO subtraction is performed using simple subtraction operation.
 
- 5) FLAT images are combined using the median and sigma clip with the
- default thresholds. The master flat is normalized using 10% of the
+ 5) FLAT images are scaled by the inverse of their median values, 
+ and median combined using sigma clip with the default thresholds
+ (`sigma_clip_low_thresh=3, sigma_clip_high_thresh=3`).
+ The master flat is normalized using 10% of the
  image size centered in the middle of the merged image.
 
  6) FLAT correction is performed using common division.
