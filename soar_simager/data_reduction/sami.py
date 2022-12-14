@@ -248,7 +248,7 @@ def process_dark_files(df, red_path):
 
             hdul = pyfits.open(dark_file)
             data, header, prefix = sami_pipeline.reduce(hdul)
-            pyfits.writeto(output_dark_file, data, header)
+            pyfits.writeto(output_dark_file, data.value, header=header)
 
         if len(dark_list) == 0:
             continue
@@ -345,7 +345,7 @@ def process_flat_files(df, red_path):
 
                 hdul = pyfits.open(flat_file)
                 data, header, prefix = sami_pipeline.reduce(hdul)
-                pyfits.writeto(output_flat, data, header)
+                pyfits.writeto(output_flat, data.value, header=header)
 
             if len(flat_list) == 0:
                 continue
@@ -421,7 +421,7 @@ def process_object_files(df, red_path):
 
         hdul = pyfits.open(obj_file)
         data, header, prefix = sami_pipeline.reduce(hdul)
-        pyfits.writeto(output_obj_file, data, header)
+        pyfits.writeto(output_obj_file, data.value, header=header)
 
     return df
 
@@ -479,7 +479,7 @@ def process_zero_files(df, red_path):
 
             hdul = pyfits.open(zero_file)
             data, header, prefix = sami_pipeline.reduce(hdul)
-            pyfits.writeto(output_zero_file, data, header)
+            pyfits.writeto(output_zero_file, data.value, header=header)
 
         if len(zero_list) == 0:
                 continue

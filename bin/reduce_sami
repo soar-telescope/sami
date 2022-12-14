@@ -11,8 +11,7 @@ __version__ = version
 
 def main():
     args = _parse_arguments()
-    sami.data_reduction(args.path, debug=args.debug)
-
+    sami.data_reduction(args.path, outfolder=args.outfolder, debug=args.debug)
 
 def _parse_arguments():
     """
@@ -34,6 +33,9 @@ def _parse_arguments():
 
     parser.add_argument('path', type=str,
                         help="Path containing the data to be reduced.")
+
+    parser.add_argument('--outfolder', type=str, default=False,
+                        help="Path to save the processed data")
 
     parser.add_argument('-D', '--debug', action='store_true',
                         help="Turn on DEBUG mode (overwrite quiet mode).")
